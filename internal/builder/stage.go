@@ -115,6 +115,32 @@ type Stage struct {
 	Hints []Hint
 }
 
+// ReadAllStages discovers all .md files under basepath, parses each with
+// ReadStageFile, and returns them keyed by their slug. Returns an error if any
+// file fails to parse or if two stages share the same slug.
+func ReadAllStages(basepath string) (map[string]*Stage, error) {
+	filenames, err := helpers.ListFiles(basepath, ".md")
+	if err != nil {
+		return nil, fmt.Errorf("unable to list stage files: %w", err)
+	}
+
+	stages := make(map[string]*Stage)
+	for _, filename := range filenames {
+		stage, err := ReadStageFile(filename)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read stage file %q: %w", filename, err)
+		}
+
+		if _, exists := stages[stage.Frontmatter.Slug]; exists {
+			return nil, fmt.Errorf("[%s] duplicate stage slug: %s", filename, stage.Frontmatter.Slug)
+		}
+
+		stages[stage.Frontmatter.Slug] = stage
+	}
+
+	return stages, nil
+}
+
 // ReadStageFile reads and parses a stage markdown file from the given filename.
 // It extracts the YAML frontmatter, renders the markdown content to HTML, processes
 // hints and completion messages, derives the slug if not provided, and validates
