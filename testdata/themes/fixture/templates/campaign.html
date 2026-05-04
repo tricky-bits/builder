@@ -1,0 +1,12 @@
+{{define "title"}}{{.Campaign.Title}}{{end}}
+{{define "content"}}
+<article data-slug="{{.Campaign.Slug}}">
+  <h1>{{.Campaign.Title}}</h1>
+  {{if .Campaign.HasFeaturedImage}}
+  <img src="{{.Campaign.FeaturedImageURL}}" alt="{{.Campaign.Title}}">
+  {{else}}
+  <div class="placeholder"></div>
+  {{end}}
+</article>
+{{end}}
+{{template "base.html" .}}

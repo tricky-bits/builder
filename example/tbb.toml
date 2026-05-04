@@ -1,0 +1,45 @@
+[build]
+input_dir = "example"
+output_dir = "example/public"
+themes_dir = "themes"
+theme = "base"
+# XOR key obfuscating future-stage metadata, hints, and completion messages in
+# the rendered HTML. Stage bodies (where this example states answers) always
+# ship as plaintext. Set to "" to disable obfuscation entirely (dev mode).
+obfuscation_key = "tricky-bits"
+
+[site]
+name = "Tricky Bits"
+base_path = "/"
+document_title = "TBB Example"
+# **bold** words in index_title become the gradient accent in the hero.
+index_title = "Build puzzles. **Ship them as static HTML.**"
+index_subtitle = "A tiny example site that exercises every feature of the Tricky Bits Builder — pages, navigation, rich markdown, code, hints, files, and featured campaigns."
+footer_slogan = "Built to show off the builder."
+copyright = "© 2026 Tricky Bits"
+
+[[site.nav_items]]
+label = "Home"
+href = "/index.html"
+
+# A page wired into the navbar — see example/pages/guide.md.
+[[site.nav_items]]
+label = "Guide"
+href = "/guide.html"
+
+[[site.nav_items]]
+label = "About"
+href = "/about.html"
+
+[[site.footer_items]]
+label = "About"
+href = "/about.html"
+
+[[site.footer_items]]
+label = "Terms & Privacy"
+href = "/terms.html"
+
+[[site.footer_items]]
+label = "GitHub"
+href = "https://github.com/tricky-bits/builder"
+external = true

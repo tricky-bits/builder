@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{if .Site.IndexSubtitle}}<meta name="description" content="{{.Site.IndexSubtitle}}">{{end}}
+    <title>{{block "title" .}}{{.Site.DocumentTitle}}{{end}}</title>
+    <link rel="stylesheet" href="{{urlJoin .Site.BasePath "/assets/base/fonts/fonts.css"}}">
+    <link rel="stylesheet" href="{{urlJoin .Site.BasePath "/assets/base/vendor/bulma.min.css"}}">
+    <link rel="stylesheet" href="{{urlJoin .Site.BasePath "/assets/base/style.css"}}">
+    {{block "head" .}}{{end}}
+</head>
+<body>
+    <nav class="tb-nav" aria-label="Primary">
+        <a class="tb-brand" href="{{urlJoin .Site.BasePath "/index.html"}}">
+            <span class="tb-brand-mark"></span>
+            <span>{{.Site.Name}}</span>
+        </a>
+        <div class="tb-nav-menu">
+            {{range .Site.NavItems}}
+            <a href="{{if .External}}{{.Href}}{{else}}{{urlJoin $.Site.BasePath .Href}}{{end}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}>{{.Label}}</a>
+            {{end}}
+        </div>
+        <div class="tb-nav-tail"></div>
+    </nav>
+
+    <div class="tb-page-wrapper">
+        {{block "content" .}}{{end}}
+    </div>
+
+    <footer class="tb-foot">
+        <div class="tb-foot-container">
+            <div class="tb-foot-grid">
+                <div>
+                    <div class="tb-foot-brand-name">{{.Site.Name}}</div>
+                    {{if .Site.FooterSlogan}}<div class="tb-foot-slogan">// {{.Site.FooterSlogan}}</div>{{end}}
+                </div>
+                <div class="tb-foot-links">
+                    {{range .Site.FooterItems}}<a href="{{if .External}}{{.Href}}{{else}}{{urlJoin $.Site.BasePath .Href}}{{end}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}>{{.Label}}</a>{{end}}
+                </div>
+                <div class="tb-foot-meta">{{if .Site.Copyright}}{{.Site.Copyright}}{{end}}</div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{urlJoin .Site.BasePath "/assets/base/progress.js"}}"></script>
+    {{block "scripts" .}}{{end}}
+</body>
+</html>

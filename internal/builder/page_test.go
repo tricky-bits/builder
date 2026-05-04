@@ -48,29 +48,13 @@ func TestPage_Validate(t *testing.T) {
 			errContains: "slug is required",
 		},
 		{
-			name: "negative menu order",
-			page: &Page{
-				Filename: "test.md",
-				Frontmatter: PageFrontmatter{
-					Title:     "Test Page",
-					Slug:      "test-page",
-					MenuOrder: -1,
-				},
-			},
-			wantErr:     true,
-			errContains: "menu_order must be non-negative",
-		},
-		{
 			name: "valid page with all optional fields",
 			page: &Page{
 				Filename: "test.md",
 				Frontmatter: PageFrontmatter{
-					Title:     "Test Page",
-					Slug:      "test-page",
-					Theme:     "dark",
-					MenuLabel: "Test",
-					MenuOrder: 1,
-					MenuIcon:  "icon-test",
+					Title: "Test Page",
+					Slug:  "test-page",
+					Theme: "dark",
 				},
 			},
 			wantErr: false,
@@ -92,3 +76,4 @@ func TestPage_Validate(t *testing.T) {
 		})
 	}
 }
+

@@ -1,0 +1,201 @@
+{{define "title"}}{{.Stage.Title}} — {{.Site.DocumentTitle}}{{end}}
+
+{{define "content"}}
+<div class="tb-container">
+    {{/* Breadcrumb */}}
+    <div class="tb-label tb-breadcrumb">
+        <a href="{{urlJoin .Site.BasePath "/index.html"}}#campaigns">Campaigns</a>
+        <span class="tb-breadcrumb-sep">/</span>
+        <a href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug}}">{{.Campaign.Title}}</a>
+        <span class="tb-breadcrumb-sep">/</span>
+        <span class="tb-breadcrumb-current">{{.Stage.Title}}</span>
+    </div>
+
+    <div class="columns">
+        {{/* ── Left column ── */}}
+        <div class="column is-7">
+
+            {{/* Title */}}
+            <h1 class="tb-display-lg">{{.Stage.Title}}</h1>
+
+            {{/* Author / Difficulty / ETA meta row */}}
+            <div class="tb-stage-meta-row">
+                {{if .Stage.Author}}
+                <div class="tb-author">
+                    <div class="tb-avatar">{{slice .Stage.Author 0 1}}</div>
+                    <div>
+                        <p class="tb-label tb-label--xs">Architect</p>
+                        <p class="tb-meta-value">{{.Stage.Author}}</p>
+                    </div>
+                </div>
+                <span class="tb-meta-sep"></span>
+                {{end}}
+                {{if gt .Stage.Difficulty 0}}
+                <div>
+                    <p class="tb-label tb-label--xs">Difficulty</p>
+                    <p class="tb-mono tb-difficulty-value">
+                        {{.Stage.Difficulty}}/5
+                        <span class="tb-pips">
+                            {{if ge .Stage.Difficulty 1}}<span class="tb-pip tb-pip--filled"></span>{{else}}<span class="tb-pip"></span>{{end}}
+                            {{if ge .Stage.Difficulty 2}}<span class="tb-pip tb-pip--filled"></span>{{else}}<span class="tb-pip"></span>{{end}}
+                            {{if ge .Stage.Difficulty 3}}<span class="tb-pip tb-pip--filled"></span>{{else}}<span class="tb-pip"></span>{{end}}
+                            {{if ge .Stage.Difficulty 4}}<span class="tb-pip tb-pip--filled"></span>{{else}}<span class="tb-pip"></span>{{end}}
+                            {{if ge .Stage.Difficulty 5}}<span class="tb-pip tb-pip--filled"></span>{{else}}<span class="tb-pip"></span>{{end}}
+                        </span>
+                    </p>
+                </div>
+                <span class="tb-meta-sep"></span>
+                {{end}}
+                {{if gt .Stage.ETAMinutes 0}}
+                <div>
+                    <p class="tb-label tb-label--xs">ETA</p>
+                    <p class="tb-meta-value">{{.Stage.ETAMinutes}} min</p>
+                </div>
+                {{end}}
+            </div>
+
+            {{/* Content card */}}
+            <div class="tb-card tb-card--content">
+                <div class="tb-prose tb-prose--justify">{{.Stage.Content}}</div>
+            </div>
+
+            {{/* Files */}}
+            {{if .Stage.Inputs}}
+            <div class="tb-files">
+                <span class="tb-label">◆ Files</span>
+                <div class="tb-file-list">
+                    {{range .Stage.Inputs}}
+                    <a class="tb-chip tb-chip--dim" href="{{urlJoin $.Site.BasePath "campaigns" $.Campaign.Slug $.Stage.Slug .}}">{{.}}</a>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            {{/* Answer form */}}
+            {{if .Stage.AnswerHash}}
+            <div class="tb-answer-section" id="answer-box">
+                <p class="tb-label tb-label--mb-lg">◆ Input solution</p>
+                <form onsubmit="TBProgress.checkAnswer(event)" class="field has-addons tb-answer-form">
+                    <div class="control is-expanded">
+                        <input class="input tb-answer-input" type="text" id="tb-answer-input" placeholder="Enter the solution…" required>
+                    </div>
+                    <div class="control">
+                        <button class="tb-btn tb-btn-primary tb-btn-glow" type="submit">Submit <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12M11 5l5 5-5 5"/></svg></button>
+                    </div>
+                </form>
+                <div id="tb-answer-feedback"></div>
+            </div>
+
+            <div id="tb-completion-box" class="tb-completion-box">
+                <div class="tb-card tb-card--cleared">
+                    <p class="tb-label tb-label--primary tb-label--mb">◇ Stage cleared</p>
+                    <div id="tb-completion-msg">
+                        {{if .Stage.EncCompletionMessage}}<div data-z data-q="{{.Stage.EncCompletionMessage}}"></div>{{else}}<p class="tb-fallback-text">Correct! Well done.</p>{{end}}
+                    </div>
+                    {{if .Stage.Next}}
+                    <a class="tb-btn tb-btn-primary tb-btn--next" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug .Stage.Next}}">
+                        Next Stage →
+                    </a>
+                    {{end}}
+                </div>
+                {{if and (not .Stage.Next) .Campaign.EncCompletionMessage}}
+                <div class="tb-card tb-reward-card tb-reward-card--mt">
+                    <div class="tb-flex-1">
+                        <p class="tb-label tb-label--secondary tb-label--mb">◆ Sealed message</p>
+                        <div class="tb-prose tb-prose--justify" data-z data-q="{{.Campaign.EncCompletionMessage}}"></div>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+
+            {{/* Nav buttons */}}
+            {{if .Stage.Next}}{{if eq .Stage.AnswerHash ""}}
+            <div class="tb-nav-buttons">
+                <a class="tb-btn tb-btn-primary" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug .Stage.Next}}">Next Stage →</a>
+            </div>
+            {{end}}{{end}}
+        </div>
+
+        {{/* ── Right column — sidebar ── */}}
+        <div class="column is-5">
+            <aside class="tb-stage-sidebar">
+
+                {{/* Tags */}}
+                {{if .Stage.Tags}}
+                <div class="tb-sidebar-box">
+                    <p class="tb-label tb-sidebar-label">
+                        <span class="tb-icon-accent"><svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5V4h5.5L17 12.5 12.5 17 4 8.5"/><circle cx="6.5" cy="6.5" r="0.9" fill="currentColor"/></svg></span> Technologies
+                    </p>
+                    <div class="tb-chips">
+                        {{range .Stage.Tags}}<span class="tb-chip">{{.}}</span>{{end}}
+                    </div>
+                </div>
+                {{end}}
+
+                {{/* Hints */}}
+                {{if .Stage.Hints}}
+                <div class="tb-sidebar-box">
+                    <p class="tb-label tb-sidebar-label">
+                        <span class="tb-icon-accent"><svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 14h6M8 17h4"/><path d="M6 11a4 4 0 1 1 8 0c0 1.4-1 2.4-1.5 3h-5C7 13.4 6 12.4 6 11Z"/></svg></span> Strategic hints
+                    </p>
+                    <div class="tb-hint-list">
+                        {{range $i, $hint := .Stage.Hints}}
+                        <div class="tb-hint-box" id="tb-hint-box-{{$i}}">
+                            <div class="tb-hint-row" onclick="TBProgress.revealHint({{$i}}, {{$hint.WaitSeconds}})">
+                                <span class="tb-hint-label">Hint {{$i}}</span>
+                                <span class="tb-hint-status" id="tb-hint-status-{{$i}}">
+                                    <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-label="Locked"><rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg>
+                                </span>
+                            </div>
+                            <div class="tb-recessed tb-hint-content" id="tb-hint-content-{{$i}}">
+                                <p class="tb-label tb-label--secondary tb-label--mb-sm">◇ Unlocked hint</p>
+                                <div class="tb-hint-text" data-z data-q="{{$hint.EncContent}}"></div>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+
+                {{/* Campaign progress */}}
+                <div class="tb-sidebar-box">
+                    <p class="tb-label tb-sidebar-label">
+                        <span class="tb-icon-accent"><svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="11" width="4" height="6" rx="0.6"/><rect x="8" y="7" width="4" height="10" rx="0.6"/><rect x="13.5" y="3" width="4" height="14" rx="0.6"/></svg></span> Campaign progress
+                    </p>
+                    <ul class="tb-progress-list">
+                        {{range $i := seq .Campaign.StageCount}}
+                        <li data-tb-stage-index="{{$i}}" class="tb-stage-locked{{if eq $i $.Stage.OrderIndex}} tb-progress-current{{end}}">
+                            <a class="tb-progress-link"><span class="tb-stage-title-redacted">████████</span></a>
+                        </li>
+                        {{end}}
+                    </ul>
+                </div>
+
+            </aside>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "head"}}
+<link rel="stylesheet" href="{{urlJoin .Site.BasePath "/assets/base/vendor/github-dark.min.css"}}">
+<script src="{{urlJoin .Site.BasePath "/assets/base/vendor/highlight.min.js"}}"></script>
+<script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+{{end}}
+
+{{define "scripts"}}
+<script>
+TBProgress.initStage({
+    campaign: {{.Campaign.Slug | json}},
+    stage: {{.Stage.Slug | json}},
+    hasAnswer: {{if .Stage.AnswerHash}}true{{else}}false{{end}},
+    isLast: {{if .Stage.Next}}false{{else}}true{{end}},
+    expectedHash: {{.Stage.AnswerHash | json}},
+    payloads: {{.Campaign.Payloads | json}},
+    k: {{.K | json}}
+});
+</script>
+{{end}}
+
+{{template "base.html" .}}

@@ -1,0 +1,11 @@
+{{define "title"}}404 — {{.Site.DocumentTitle}}{{end}}
+
+{{define "content"}}
+<div class="tb-container" style="text-align: center; padding: 6rem 1.5rem;">
+    <p style="font-family: var(--tb-f-display); font-size: 7rem; font-weight: 700; color: var(--tb-primary); line-height: 1; margin-bottom: 1rem;">404</p>
+    <p style="font-size: 1.2rem; color: var(--tb-text-muted); margin-bottom: 2.5rem;">Page not found.</p>
+    <a class="tb-btn tb-btn-secondary" href="{{urlJoin .Site.BasePath "/index.html"}}">← Back to Home</a>
+</div>
+{{end}}
+
+{{template "base.html" .}}
