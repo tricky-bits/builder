@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/tricky-bits/builder/internal/helpers"
@@ -23,17 +25,6 @@ type PageFrontmatter struct {
 
 	// Theme optionally overrides the global theme for this page.
 	Theme string `yaml:"theme,omitempty"`
-
-	// MenuLabel, when set, indicates that the page should be included in the
-	// generated navigation menu using this label.
-	MenuLabel string `yaml:"menu_label,omitempty"`
-
-	// MenuOrder controls the relative ordering of the page in navigation menus.
-	// Lower values appear first.
-	MenuOrder int `yaml:"menu_order,omitempty"`
-
-	// MenuIcon is an optional icon identifier for the navigation menu entry.
-	MenuIcon string `yaml:"menu_icon,omitempty"`
 
 	// PublishedAt is the page publication timestamp (optional).
 	PublishedAt *time.Time `yaml:"published_at,omitempty"`
@@ -119,9 +110,44 @@ func (p *Page) Validate() error {
 		return fmt.Errorf("slug is required")
 	}
 
-	if p.Frontmatter.MenuOrder < 0 {
-		return fmt.Errorf("menu_order must be non-negative, got %d", p.Frontmatter.MenuOrder)
+	return nil
+}
+
+// Build renders the page to an HTML file under outputDir.
+func (p *Page) Build(b *Builder) error {
+	basename := filepath.Base(p.Filename)
+
+	t, err := b.themeMgr.Load(p.Frontmatter.Theme, b.config.Build.Theme)
+	if err != nil {
+		return fmt.Errorf("[%s] load theme: %w", basename, err)
 	}
 
+	type pageData struct {
+		PageTitle string
+		Content   template.HTML
+	}
+
+	data := struct {
+		Site SiteConfig
+		Page pageData
+	}{
+		Site: b.config.Site,
+		Page: pageData{
+			PageTitle: p.Frontmatter.Title,
+			Content:   p.Content,
+		},
+	}
+
+	var buffer bytes.Buffer
+	if err := t.Render(&buffer, "page.html", data); err != nil {
+		return fmt.Errorf("[%s] render page: %w", basename, err)
+	}
+
+	outputPath := filepath.Join(b.config.Build.OutputDir, p.Frontmatter.Slug+".html")
+	if err := os.WriteFile(outputPath, buffer.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("[%s] write rendered page: %w", basename, err)
+	}
+
+	b.logger.Info("built page", "slug", p.Frontmatter.Slug)
 	return nil
 }

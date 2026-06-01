@@ -212,6 +212,15 @@ func TestLoadCampaign(t *testing.T) {
 		assert.Len(t, campaign.Stages, 2)
 		assert.Contains(t, campaign.Stages, "stage-01")
 		assert.Contains(t, campaign.Stages, "stage-02")
+		assert.False(t, campaign.Frontmatter.Featured, "Featured defaults to false when omitted")
+	})
+
+	t.Run("featured campaign parses featured field", func(t *testing.T) {
+		campaign, err := LoadCampaign("../../testdata/campaigns/featured-campaign")
+		require.NoError(t, err)
+		require.NotNil(t, campaign)
+
+		assert.True(t, campaign.Frontmatter.Featured)
 	})
 
 	t.Run("missing campaign.md returns descriptive error", func(t *testing.T) {

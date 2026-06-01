@@ -1,0 +1,91 @@
+{{define "title"}}{{.Site.DocumentTitle}}{{end}}
+
+{{define "content"}}
+<section class="tb-hero">
+    {{if .Hero.TitleHTML}}<h1 class="tb-hero-title">{{.Hero.TitleHTML}}</h1>{{end}}
+    {{if .Hero.SubtitleText}}<p class="tb-hero-subtitle tb-body-lg">{{.Hero.SubtitleText}}</p>{{end}}
+</section>
+
+<div class="tb-container">
+    {{if .Featured}}
+    <section class="tb-block tb-block--featured">
+        <p class="tb-label" style="margin-bottom: 8px;">// 01</p>
+        <h2 class="tb-section-title">Featured campaigns</h2>
+        <div class="columns is-multiline">
+            {{range .Featured}}
+            <div class="column is-4">
+                <a class="tb-card tb-card--featured"
+                    href="{{urlJoin $.Site.BasePath "campaigns" .Slug}}"
+                    data-tb-campaign-id="{{.Slug}}">
+                    <div class="tb-card-thumb tb-card-thumb--16x9{{if not .HasFeaturedImage}} tb-card-thumb--placeholder{{end}}"
+                        {{if .HasFeaturedImage}}style="background-image: url('{{.FeaturedImageURL}}');"{{end}}></div>
+                    <div class="tb-card-body">
+                        <div class="tb-chips">
+                            {{if .Category}}<span class="tb-chip tb-chip--dim">{{.Category}}</span>{{end}}
+                        </div>
+                        <p class="tb-card-title">{{.Title}}</p>
+                        {{if .Abstract}}<div class="tb-card-abstract tb-clamp-2">{{.Abstract}}</div>{{end}}
+                        <div class="tb-chips tb-card-meta">
+                            {{if gt .ETAMinutes 0}}<span class="tb-chip tb-chip--dim">~{{.ETAMinutes}}m</span>{{end}}
+                            <span class="tb-chip tb-chip--dim">{{.StageCount}} stages</span>
+                            {{if gt .Difficulty 0}}<span class="tb-chip tb-chip--dim">Difficulty: {{.Difficulty}}/5</span>{{end}}
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {{end}}
+        </div>
+    </section>
+    {{end}}
+
+    <section class="tb-block tb-block--available" id="tb-available">
+        <p class="tb-label" style="margin-bottom: 8px;">// 02</p>
+        <h2 class="tb-section-title">Available campaigns</h2>
+        {{if .NonFeatured}}
+        <div class="columns is-multiline" id="tb-available-grid">
+            {{range .NonFeatured}}
+            <div class="column is-4">
+                <a class="tb-card tb-card--available"
+                    href="{{urlJoin $.Site.BasePath "campaigns" .Slug}}"
+                    data-tb-campaign-id="{{.Slug}}">
+                    <div class="tb-card-body">
+                        <p class="tb-card-title">{{.Title}}</p>
+                        <div class="tb-chips">
+                            {{if .Category}}<span class="tb-chip tb-chip--dim">{{.Category}}</span>{{end}}
+                            {{if gt .ETAMinutes 0}}<span class="tb-chip tb-chip--dim">~{{.ETAMinutes}}m</span>{{end}}
+                            <span class="tb-chip tb-chip--dim">{{.StageCount}} stages</span>
+                            {{if gt .Difficulty 0}}<span class="tb-chip tb-chip--dim">Difficulty: {{.Difficulty}}/5</span>{{end}}
+                        </div>
+                        {{if .Abstract}}<div class="tb-card-abstract tb-clamp-2">{{.Abstract}}</div>{{end}}
+                    </div>
+                </a>
+            </div>
+            {{end}}
+        </div>
+        {{else}}
+        <p style="color: var(--tb-text-muted); font-style: italic;">No campaigns yet.</p>
+        {{end}}
+    </section>
+
+    <section class="tb-block tb-block--completed" id="tb-completed" style="display:none;">
+        <p class="tb-label" style="margin-bottom: 8px;">// 03</p>
+        <h2 class="tb-section-title">Completed campaigns</h2>
+        <div class="tb-list" id="tb-completed-list"></div>
+    </section>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+TBProgress.initHome({
+    featured: [
+        {{range $i, $c := .Featured}}{{if $i}},{{end}}{ id: {{$c.Slug | json}}, order: {{$c.StageOrderedSlugs | json}} }{{end}}
+    ],
+    nonFeatured: [
+        {{range $i, $c := .NonFeatured}}{{if $i}},{{end}}{ id: {{$c.Slug | json}}, order: {{$c.StageOrderedSlugs | json}} }{{end}}
+    ]
+});
+</script>
+{{end}}
+
+{{template "base.html" .}}

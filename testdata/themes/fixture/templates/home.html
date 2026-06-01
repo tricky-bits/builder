@@ -1,0 +1,18 @@
+{{define "title"}}{{.Site.DocumentTitle}}{{end}}
+{{define "content"}}
+<main>
+{{range .Featured}}
+<a class="card" href="{{urlJoin $.Site.BasePath "campaigns" .Slug}}" data-slug="{{.Slug}}">
+  <div class="thumb{{if not .HasFeaturedImage}} thumb--placeholder{{end}}"{{if .HasFeaturedImage}} style="background-image: url('{{.FeaturedImageURL}}');"{{end}}></div>
+  <p>{{.Title}}</p>
+</a>
+{{end}}
+{{range .NonFeatured}}
+<a class="card" href="{{urlJoin $.Site.BasePath "campaigns" .Slug}}" data-slug="{{.Slug}}">
+  <div class="thumb{{if not .HasFeaturedImage}} thumb--placeholder{{end}}"{{if .HasFeaturedImage}} style="background-image: url('{{.FeaturedImageURL}}');"{{end}}></div>
+  <p>{{.Title}}</p>
+</a>
+{{end}}
+</main>
+{{end}}
+{{template "base.html" .}}

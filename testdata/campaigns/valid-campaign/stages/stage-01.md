@@ -2,6 +2,7 @@
 title: "Stage One"
 author: "Test Author"
 slug: "stage-01"
+difficulty: 1
 start: true
 next: "stage-02"
 ---

@@ -9,8 +9,10 @@
 package theme
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,12 +32,17 @@ type Theme struct {
 
 	// TemplateSets contains one parsed template set per required entry template.
 	// Each set bundles the entry template together with all helper templates.
-	// Key is the entry template filename (e.g., "stage.tmpl").
+	// Key is the entry template filename (e.g., "stage.html").
 	TemplateSets map[string]*template.Template
 
 	// StaticDir is the path to the theme's static asset directory
 	// (themes/<name>/static). Empty string means no static assets.
 	StaticDir string
+
+	// FeaturedImageFallbacks is the sorted list of *.png filenames discovered in
+	// <StaticDir>/fallbacks/, used as campaign featured-image fallbacks.
+	// Nil when the directory is missing or empty.
+	FeaturedImageFallbacks []string
 
 	// copied tracks whether CopyAssets has already run for this theme.
 	copied bool
@@ -102,11 +109,24 @@ func (t *Theme) CopyAssets(outputDir string) error {
 // This is intentionally unexported: external code must not modify this slice, as it
 // is used during theme validation.
 var requiredTemplates = []string{
-	"site_index.tmpl",
-	"campaign_index.tmpl",
-	"stage.tmpl",
-	"404.tmpl",
-	"page.tmpl",
+	"home.html",
+	"campaign.html",
+	"stage.html",
+	"404.html",
+	"page.html",
+}
+
+// Render executes the named template against data, writing the result to w.
+func (t *Theme) Render(w io.Writer, templateName string, data any) error {
+	tmplSet, ok := t.TemplateSets[templateName]
+	if !ok {
+		return fmt.Errorf("theme %q: template %q not found", t.Name, templateName)
+	}
+	tmpl := tmplSet.Lookup(templateName)
+	if tmpl == nil {
+		return fmt.Errorf("theme %q: template %q could not be looked up", t.Name, templateName)
+	}
+	return tmpl.Execute(w, data)
 }
 
 // LoadFromPath loads and validates a theme from themesDir/name.
@@ -128,6 +148,38 @@ func LoadFromPath(name, themesDir string) (*Theme, error) {
 
 	funcMap := template.FuncMap{
 		"urlJoin": JoinURL,
+		"add":     func(a, b int) int { return a + b },
+		"json": func(v any) (template.JS, error) {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return "", err
+			}
+			return template.JS(b), nil
+		},
+		"formatETA": func(minutes int) string {
+			if minutes <= 0 {
+				return ""
+			}
+			h := minutes / 60
+			m := minutes % 60
+			if h == 0 {
+				return fmt.Sprintf("%dm", m)
+			}
+			if m == 0 {
+				return fmt.Sprintf("%dh", h)
+			}
+			return fmt.Sprintf("%dh %dm", h, m)
+		},
+		"seq": func(n int) []int {
+			if n <= 0 {
+				return nil
+			}
+			out := make([]int, n)
+			for i := range out {
+				out[i] = i
+			}
+			return out
+		},
 	}
 
 	// Collect all .tmpl files from the templates directory.
@@ -136,7 +188,7 @@ func LoadFromPath(name, themesDir string) (*Theme, error) {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".tmpl") {
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".html") {
 			allFiles = append(allFiles, path)
 		}
 		return nil
@@ -216,10 +268,16 @@ func LoadFromPath(name, themesDir string) (*Theme, error) {
 		staticDir = ""
 	}
 
+	fallbacks, err := discoverFallbacks(staticDir)
+	if err != nil {
+		return nil, err
+	}
+
 	t := &Theme{
-		Name:         name,
-		TemplateSets: templateSets,
-		StaticDir:    staticDir,
+		Name:                   name,
+		TemplateSets:           templateSets,
+		StaticDir:              staticDir,
+		FeaturedImageFallbacks: fallbacks,
 	}
 
 	if err := t.Validate(); err != nil {

@@ -2,15 +2,40 @@ package builder
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/tricky-bits/builder/internal/helpers"
 	"github.com/tricky-bits/builder/internal/markdown"
+	"github.com/tricky-bits/builder/internal/obfuscate"
 )
+
+// hintData is the per-hint record passed to the stage template. EncContent
+// holds the hint's rendered HTML run through the builder's encoder
+// (passthrough when the obfuscation key is empty).
+type hintData struct {
+	WaitSeconds int
+	EncContent  string
+}
+
+// encodeHints converts the domain Hint slice into template-facing hintData,
+// encoding each hint's rendered HTML through enc.
+func encodeHints(enc *obfuscate.Encoder, hints []Hint) []hintData {
+	out := make([]hintData, len(hints))
+	for i, h := range hints {
+		out[i] = hintData{
+			WaitSeconds: h.WaitSeconds,
+			EncContent:  enc.Encode(string(h.Content)),
+		}
+	}
+	return out
+}
 
 // HintFrontmatter defines a timed, click-to-reveal hint associated with a stage.
 type HintFrontmatter struct {
@@ -49,10 +74,8 @@ type StageFrontmatter struct {
 	// (optional).
 	Tags []string `yaml:"tags,omitempty"`
 
-	// Difficulty is an optional numeric indicator used for sorting or display.
-	// The scale is project-defined (e.g., 1.0–5.0).
-	// TODO Discussion: Should we stick with a float value or a int range 1-5 is enough?
-	Difficulty float64 `yaml:"difficulty,omitempty"`
+	// Difficulty is the stage difficulty on a 1–5 scale (required).
+	Difficulty int `yaml:"difficulty"`
 
 	// ETAMinutes is an optional estimate of the time required to complete the stage.
 	ETAMinutes int `yaml:"eta_minutes,omitempty"`
@@ -206,15 +229,8 @@ func (s *Stage) Validate() error {
 		return fmt.Errorf("author is required")
 	}
 
-	// Validate difficulty range (0-5 with 0.5 steps)
-	if s.Frontmatter.Difficulty < 0 || s.Frontmatter.Difficulty > 5 {
-		return fmt.Errorf("difficulty must be between 0 and 5, got %.1f", s.Frontmatter.Difficulty)
-	}
-
-	// Check if difficulty is a multiple of 0.5 (i.e., 0, 0.5, 1, 1.5, ..., 5)
-	doubledDifficulty := s.Frontmatter.Difficulty * 2
-	if doubledDifficulty != float64(int(doubledDifficulty)) {
-		return fmt.Errorf("difficulty must be in steps of 0.5, got %.2f", s.Frontmatter.Difficulty)
+	if s.Frontmatter.Difficulty < 1 || s.Frontmatter.Difficulty > 5 {
+		return fmt.Errorf("difficulty must be between 1 and 5, got %d", s.Frontmatter.Difficulty)
 	}
 
 	if s.Frontmatter.ETAMinutes < 0 {
@@ -244,6 +260,197 @@ func (s *Stage) Validate() error {
 		if _, err := os.Stat(assetPath); os.IsNotExist(err) {
 			return fmt.Errorf("[%s] asset file not found: %s", s.Filename, assetPath)
 		}
+	}
+
+	return nil
+}
+
+// HashAnswer returns the SHA-256 hex digest of s after trimming spaces and
+// lowercasing. Returns an empty string if s is empty.
+func HashAnswer(s string) string {
+	if s == "" {
+		return ""
+	}
+	s = strings.TrimSpace(s)
+	s = strings.ToLower(s)
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+// Build renders the stage to an HTML file and copies input/asset files.
+func (s *Stage) Build(b *Builder, c *Campaign) error {
+	basename := filepath.Base(s.Filename)
+
+	outputDir := filepath.Join(
+		b.config.Build.OutputDir,
+		"campaigns",
+		c.Frontmatter.Slug,
+		s.Frontmatter.Slug,
+	)
+
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("[%s] create stage output directory: %w", basename, err)
+	}
+
+	if err := s.buildStagePage(b, c, outputDir); err != nil {
+		return err
+	}
+
+	if err := s.buildStageInputs(b, outputDir); err != nil {
+		return err
+	}
+
+	if err := s.buildStageAssets(b, outputDir); err != nil {
+		return err
+	}
+
+	b.logger.Info("built stage", "campaign", c.Frontmatter.Slug, "stage", s.Frontmatter.Slug)
+	return nil
+}
+
+// buildStagePage renders the stage HTML template and writes index.html to outputDir.
+func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error {
+	basename := filepath.Base(s.Filename)
+
+	t, err := b.themeMgr.Load(s.Frontmatter.Theme, c.Frontmatter.Theme, b.config.Build.Theme)
+	if err != nil {
+		return fmt.Errorf("[%s] load theme: %w", basename, err)
+	}
+
+	// Locate this stage's index in the campaign's linear chain so the
+	// sidebar can mark the current entry without leaking its slug.
+	orderIndex := -1
+	current := c.StartSlug
+	for i := 0; current != ""; i++ {
+		if current == s.Frontmatter.Slug {
+			orderIndex = i
+			break
+		}
+		next, ok := c.Stages[current]
+		if !ok {
+			break
+		}
+		current = next.Frontmatter.Next
+	}
+
+	payloads, err := encodeStagePayloads(b, c)
+	if err != nil {
+		return fmt.Errorf("[%s] encode stage payloads: %w", basename, err)
+	}
+
+	type stageData struct {
+		Title                string
+		Slug                 string
+		Author               string
+		Tags                 []string
+		Difficulty           int
+		ETAMinutes           int
+		Content              template.HTML
+		EncCompletionMessage string
+		Next                 string
+		AnswerHash           string
+		Hints                []hintData
+		Inputs               []string
+		OrderIndex           int
+	}
+
+	type campaignData struct {
+		Slug                 string
+		Title                string
+		Category             string
+		StageStartSlug       string
+		StageCount           int
+		Payloads             string
+		HasFeaturedImage     bool
+		EncCompletionMessage string
+	}
+
+	encStageCompletion := ""
+	if s.CompletionMessage != "" {
+		encStageCompletion = b.encoder.Encode(string(s.CompletionMessage))
+	}
+	encCampaignCompletion := ""
+	if c.CompletionMessage != "" {
+		encCampaignCompletion = b.encoder.Encode(string(c.CompletionMessage))
+	}
+
+	data := struct {
+		Site     SiteConfig
+		Stage    stageData
+		Campaign campaignData
+		K        string
+	}{
+		Site: b.config.Site,
+		Stage: stageData{
+			Title:                s.Frontmatter.Title,
+			Slug:                 s.Frontmatter.Slug,
+			Author:               s.Frontmatter.Author,
+			Tags:                 s.Frontmatter.Tags,
+			Difficulty:           s.Frontmatter.Difficulty,
+			ETAMinutes:           s.Frontmatter.ETAMinutes,
+			Content:              s.Content,
+			EncCompletionMessage: encStageCompletion,
+			Next:                 s.Frontmatter.Next,
+			AnswerHash:           HashAnswer(s.Frontmatter.Answer),
+			Hints:                encodeHints(b.encoder, s.Hints),
+			Inputs:               s.Frontmatter.Inputs,
+			OrderIndex:           orderIndex,
+		},
+		Campaign: campaignData{
+			Slug:                 c.Frontmatter.Slug,
+			Title:                c.Frontmatter.Title,
+			Category:             c.Frontmatter.Category,
+			StageStartSlug:       c.StartSlug,
+			StageCount:           len(c.Stages),
+			Payloads:             payloads,
+			HasFeaturedImage:     c.HasFeaturedImage,
+			EncCompletionMessage: encCampaignCompletion,
+		},
+		K: b.config.Build.ObfuscationKey,
+	}
+
+	var buffer bytes.Buffer
+	if err := t.Render(&buffer, "stage.html", data); err != nil {
+		return fmt.Errorf("[%s] render stage: %w", basename, err)
+	}
+
+	outputPath := filepath.Join(outputDir, "index.html")
+	if err := os.WriteFile(outputPath, buffer.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("[%s] write rendered stage: %w", basename, err)
+	}
+
+	return nil
+}
+
+// buildStageInputs copies the stage's input files to outputDir.
+func (s *Stage) buildStageInputs(b *Builder, outputDir string) error {
+	basename := filepath.Base(s.Filename)
+	stageDir := filepath.Dir(s.Filename)
+
+	for _, inputFile := range s.Frontmatter.Inputs {
+		srcPath := filepath.Join(stageDir, inputFile)
+		dstPath := filepath.Join(outputDir, inputFile)
+		if err := helpers.CopyFile(srcPath, dstPath); err != nil {
+			return fmt.Errorf("[%s] copy input file %q: %w", basename, inputFile, err)
+		}
+		b.logger.Info("copied input file", "stage", s.Frontmatter.Slug, "file", inputFile)
+	}
+
+	return nil
+}
+
+// buildStageAssets copies the stage's asset files to outputDir.
+func (s *Stage) buildStageAssets(b *Builder, outputDir string) error {
+	basename := filepath.Base(s.Filename)
+	stageDir := filepath.Dir(s.Filename)
+
+	for _, assetFile := range s.Frontmatter.Assets {
+		srcPath := filepath.Join(stageDir, assetFile)
+		dstPath := filepath.Join(outputDir, assetFile)
+		if err := helpers.CopyFile(srcPath, dstPath); err != nil {
+			return fmt.Errorf("[%s] copy asset file %q: %w", basename, assetFile, err)
+		}
+		b.logger.Info("copied asset file", "stage", s.Frontmatter.Slug, "file", assetFile)
 	}
 
 	return nil
