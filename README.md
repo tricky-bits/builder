@@ -113,6 +113,7 @@ theme: dark                     # optional override (stage > campaign > global)
 start: true                     # marks the campaign entry point (exactly one)
 next: answering                 # slug of the next stage (omit on last)
 answer: 42                      # expected solution; shipped as a SHA-256 hash
+answer_sha256: 9c56...          # precomputed answer hash (ship without plaintext)
 completion_message: Solved!     # shown on stage completion
 inputs: [data.json]             # files copied + listed in the stage info section
 assets: [diagram.png]           # files copied but not listed
@@ -129,6 +130,14 @@ Markdown body of the puzzle…
 
 The `answer` is never shipped in clear text — only its trimmed, lowercased
 SHA-256 hash reaches the client for in-browser checking.
+
+To publish a campaign's source without revealing solutions, drop `answer` and
+supply `answer_sha256` instead: the SHA-256 hex digest of the trimmed, lowercased
+answer (the same value `answer` would produce). A stage may carry either field,
+both, or neither — neither is valid for informational stages that only link
+`next`. When both are present, the plaintext `answer` wins and a stale
+`answer_sha256` is logged as a build warning. A malformed `answer_sha256` (not 64
+lowercase hex chars) fails the build so a stage never ships silently unsolvable.
 
 ### Page frontmatter (`pages/<file>.md`)
 

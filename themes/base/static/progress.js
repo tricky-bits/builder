@@ -623,6 +623,20 @@
                 completedSection.style.display = '';
             }
         }
+
+        renumberSections();
+    }
+
+    function renumberSections() {
+        var sections = document.querySelectorAll('.tb-block');
+        var n = 0;
+        sections.forEach(function (sec) {
+            if (window.getComputedStyle(sec).display === 'none') return;
+            var label = sec.querySelector('.tb-section-num');
+            if (!label) return;
+            n += 1;
+            label.textContent = (n < 10 ? '0' : '') + n;
+        });
     }
 
     function normalizePath(p) {

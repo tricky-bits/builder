@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -93,6 +94,12 @@ type StageFrontmatter struct {
 	// Answer is the expected solution token/value for the stage (optional), used
 	// for validation or gating progression depending on the application logic.
 	Answer string `yaml:"answer,omitempty"`
+
+	// AnswerSHA256 is a precomputed SHA-256 hex digest of the answer, letting
+	// campaigns ship publicly without the plaintext answer. It must be the digest
+	// of the trimmed, lowercased answer (see HashAnswer). When Answer is also set,
+	// plaintext wins and this value is ignored (a mismatch is logged at build time).
+	AnswerSHA256 string `yaml:"answer_sha256,omitempty"`
 
 	// Hints is the ordered list of timed hints for the stage (optional).
 	Hints []HintFrontmatter `yaml:"hints,omitempty"`
@@ -213,6 +220,10 @@ func ReadStageFile(filename string) (*Stage, error) {
 		stage.Frontmatter.Slug = helpers.DeriveSlug(filename)
 	}
 
+	// Normalize a precomputed answer hash so it matches the lowercase hex emitted
+	// by HashAnswer and the in-browser SHA-256 comparison.
+	stage.Frontmatter.AnswerSHA256 = strings.ToLower(strings.TrimSpace(stage.Frontmatter.AnswerSHA256))
+
 	if err := stage.Validate(); err != nil {
 		return nil, err
 	}
@@ -235,6 +246,12 @@ func (s *Stage) Validate() error {
 
 	if s.Frontmatter.ETAMinutes < 0 {
 		return fmt.Errorf("eta_minutes must be non-negative, got %d", s.Frontmatter.ETAMinutes)
+	}
+
+	// A precomputed answer hash must be a SHA-256 hex digest, otherwise the stage
+	// ships silently unsolvable. Absence stays legal (informational stages).
+	if s.Frontmatter.AnswerSHA256 != "" && !sha256HexRE.MatchString(s.Frontmatter.AnswerSHA256) {
+		return fmt.Errorf("answer_sha256 must be a 64-character SHA-256 hex digest, got %q", s.Frontmatter.AnswerSHA256)
 	}
 
 	// Validate hints
@@ -263,6 +280,25 @@ func (s *Stage) Validate() error {
 	}
 
 	return nil
+}
+
+// sha256HexRE matches a lowercase SHA-256 hex digest.
+var sha256HexRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// ResolveAnswerHash returns the answer hash shipped to the client. Plaintext
+// wins: when Answer is set, its HashAnswer digest is used and any precomputed
+// AnswerSHA256 is ignored. mismatch reports that both were set but disagreed,
+// signalling a stale precomputed hash worth warning about. When Answer is empty
+// the precomputed AnswerSHA256 is returned as-is (empty for informational stages).
+func (s *Stage) ResolveAnswerHash() (hash string, mismatch bool) {
+	if s.Frontmatter.Answer != "" {
+		h := HashAnswer(s.Frontmatter.Answer)
+		if s.Frontmatter.AnswerSHA256 != "" && s.Frontmatter.AnswerSHA256 != h {
+			return h, true
+		}
+		return h, false
+	}
+	return s.Frontmatter.AnswerSHA256, false
 }
 
 // HashAnswer returns the SHA-256 hex digest of s after trimming spaces and
@@ -365,6 +401,12 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 		EncCompletionMessage string
 	}
 
+	answerHash, mismatch := s.ResolveAnswerHash()
+	if mismatch {
+		b.logger.Warn("answer_sha256 does not match plaintext answer; using plaintext",
+			"campaign", c.Frontmatter.Slug, "stage", s.Frontmatter.Slug)
+	}
+
 	encStageCompletion := ""
 	if s.CompletionMessage != "" {
 		encStageCompletion = b.encoder.Encode(string(s.CompletionMessage))
@@ -391,7 +433,7 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 			Content:              s.Content,
 			EncCompletionMessage: encStageCompletion,
 			Next:                 s.Frontmatter.Next,
-			AnswerHash:           HashAnswer(s.Frontmatter.Answer),
+			AnswerHash:           answerHash,
 			Hints:                encodeHints(b.encoder, s.Hints),
 			Inputs:               s.Frontmatter.Inputs,
 			OrderIndex:           orderIndex,
