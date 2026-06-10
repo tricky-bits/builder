@@ -72,9 +72,14 @@ func RenderIndexPage(b *Builder) error {
 			current = stage.Frontmatter.Next
 		}
 
+		_, title, err := markdown.HeroTitle(c.Frontmatter.Title)
+		if err != nil {
+			return fmt.Errorf("[index.md] render campaign hero title: %w", err)
+		}
+
 		item := campaignItem{
 			Slug:              c.Frontmatter.Slug,
-			Title:             c.Frontmatter.Title,
+			Title:             title,
 			Category:          c.Frontmatter.Category,
 			Abstract:          c.Abstract,
 			Order:             c.Frontmatter.Order,
@@ -96,7 +101,7 @@ func RenderIndexPage(b *Builder) error {
 		}
 	}
 
-	heroTitleHTML, err := markdown.RenderHeroTitle(b.config.Site.IndexTitle)
+	heroTitleHTML, _, err := markdown.HeroTitle(b.config.Site.IndexTitle)
 	if err != nil {
 		return fmt.Errorf("[index.md] render hero title: %w", err)
 	}

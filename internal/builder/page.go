@@ -122,8 +122,14 @@ func (p *Page) Build(b *Builder) error {
 		return fmt.Errorf("[%s] load theme: %w", basename, err)
 	}
 
+	titleHTML, titleText, err := markdown.HeroTitle(p.Frontmatter.Title)
+	if err != nil {
+		return fmt.Errorf("[%s] render page hero title: %w", basename, err)
+	}
+
 	type pageData struct {
 		PageTitle string
+		TitleHTML template.HTML
 		Content   template.HTML
 	}
 
@@ -133,7 +139,8 @@ func (p *Page) Build(b *Builder) error {
 	}{
 		Site: b.config.Site,
 		Page: pageData{
-			PageTitle: p.Frontmatter.Title,
+			PageTitle: titleText,
+			TitleHTML: titleHTML,
 			Content:   p.Content,
 		},
 	}

@@ -1,5 +1,5 @@
 ---
-title: A Downloadable Input
+title: A **Downloadable** Input
 author: Margaret
 slug: input-file
 difficulty: 2

@@ -38,9 +38,13 @@ func encodeStagePayloads(b *Builder, c *Campaign) (string, error) {
 		if !ok {
 			break
 		}
+		_, title, err := markdown.HeroTitle(s.Frontmatter.Title)
+		if err != nil {
+			return "", err
+		}
 		payloads = append(payloads, stagePayload{
 			Slug:       current,
-			Title:      s.Frontmatter.Title,
+			Title:      title,
 			Difficulty: s.Frontmatter.Difficulty,
 			ETA:        s.Frontmatter.ETAMinutes,
 			Href:       theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, current),
@@ -396,6 +400,7 @@ func (c *Campaign) buildCampaignPage(b *Builder, outputDir string) error {
 	type campaignData struct {
 		Slug                 string
 		Title                string
+		TitleHTML            template.HTML
 		Category             string
 		Theme                string
 		Content              template.HTML
@@ -420,6 +425,11 @@ func (c *Campaign) buildCampaignPage(b *Builder, outputDir string) error {
 		encCompletion = b.encoder.Encode(string(c.CompletionMessage))
 	}
 
+	titleHTML, titleText, err := markdown.HeroTitle(c.Frontmatter.Title)
+	if err != nil {
+		return fmt.Errorf("[%s] render campaign hero title: %w", c.Frontmatter.Slug, err)
+	}
+
 	data := struct {
 		Site     SiteConfig
 		Campaign campaignData
@@ -428,7 +438,8 @@ func (c *Campaign) buildCampaignPage(b *Builder, outputDir string) error {
 		Site: b.config.Site,
 		Campaign: campaignData{
 			Slug:                 c.Frontmatter.Slug,
-			Title:                c.Frontmatter.Title,
+			Title:                titleText,
+			TitleHTML:            titleHTML,
 			Category:             c.Frontmatter.Category,
 			Theme:                c.Frontmatter.Theme,
 			Content:              c.Content,

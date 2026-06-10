@@ -1,5 +1,5 @@
 ---
-title: An Embedded Asset
+title: An **Embedded** Asset
 author: Margaret
 slug: asset-image
 difficulty: 2
@@ -8,7 +8,7 @@ next: ""
 tags:
   - files
   - assets
-answer: "diagram"
+answer: "diagramé"
 completion_message: "Asset embedded and displayed — that's a wrap."
 assets:
   - diagram.png

@@ -376,6 +376,7 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 
 	type stageData struct {
 		Title                string
+		TitleHTML            template.HTML
 		Slug                 string
 		Author               string
 		Tags                 []string
@@ -416,6 +417,15 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 		encCampaignCompletion = b.encoder.Encode(string(c.CompletionMessage))
 	}
 
+	stageTitleHTML, stageTitleText, err := markdown.HeroTitle(s.Frontmatter.Title)
+	if err != nil {
+		return fmt.Errorf("[%s] render stage hero title: %w", basename, err)
+	}
+	_, campaignTitleText, err := markdown.HeroTitle(c.Frontmatter.Title)
+	if err != nil {
+		return fmt.Errorf("[%s] render campaign hero title: %w", basename, err)
+	}
+
 	data := struct {
 		Site     SiteConfig
 		Stage    stageData
@@ -424,7 +434,8 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 	}{
 		Site: b.config.Site,
 		Stage: stageData{
-			Title:                s.Frontmatter.Title,
+			Title:                stageTitleText,
+			TitleHTML:            stageTitleHTML,
 			Slug:                 s.Frontmatter.Slug,
 			Author:               s.Frontmatter.Author,
 			Tags:                 s.Frontmatter.Tags,
@@ -440,7 +451,7 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 		},
 		Campaign: campaignData{
 			Slug:                 c.Frontmatter.Slug,
-			Title:                c.Frontmatter.Title,
+			Title:                campaignTitleText,
 			Category:             c.Frontmatter.Category,
 			StageStartSlug:       c.StartSlug,
 			StageCount:           len(c.Stages),

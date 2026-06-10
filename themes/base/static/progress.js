@@ -656,10 +656,156 @@
         });
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', markActiveNav);
-    } else {
+    /* btoa/atob only handle Latin-1; stored answers keep raw user input, so
+       round-trip through UTF-8 bytes to survive accents and emoji. */
+    function encodeBase64Utf8(str) {
+        var bytes = new TextEncoder().encode(str);
+        var bin = '';
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+    }
+
+    function decodeBase64Utf8(b64) {
+        var bin = atob(b64);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new TextDecoder().decode(bytes);
+    }
+
+    function exportProgress() {
+        var raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) raw = JSON.stringify(defaultBlob());
+        return encodeBase64Utf8(raw);
+    }
+
+    function importProgress(code) {
+        var trimmed = (code || '').trim();
+        if (!trimmed) return 'Paste a progress code first.';
+        var json;
+        try {
+            json = decodeBase64Utf8(trimmed);
+        } catch (e) {
+            return 'Invalid progress code.';
+        }
+        var parsed;
+        try {
+            parsed = JSON.parse(json);
+        } catch (e) {
+            return 'Invalid progress code.';
+        }
+        if (!parsed || typeof parsed !== 'object') return 'Invalid progress code.';
+        if (parsed.version !== SCHEMA_VERSION) return 'Progress code is from an incompatible version.';
+        if (!Array.isArray(parsed.completedCampaigns)) parsed.completedCampaigns = [];
+        if (!parsed.stageProgress || typeof parsed.stageProgress !== 'object') parsed.stageProgress = {};
+        writeBlob(parsed);
+        return null;
+    }
+
+    function resetProgress() {
+        try {
+            window.localStorage.removeItem(STORAGE_KEY);
+        } catch (e) {
+            /* disabled storage — nothing to clear */
+        }
+    }
+
+    function initProgressModal() {
+        var modal = document.getElementById('tb-progress-modal');
+        var trigger = document.getElementById('tb-progress-open');
+        if (!modal || !trigger) return;
+
+        var exportField = document.getElementById('tb-progress-export');
+        var importField = document.getElementById('tb-progress-import');
+        var copyBtn = document.getElementById('tb-progress-copy');
+        var importBtn = document.getElementById('tb-progress-import-btn');
+        var resetBtn = document.getElementById('tb-progress-reset');
+        var feedback = document.getElementById('tb-progress-feedback');
+
+        function showFeedback(kind, msg) {
+            if (!feedback) return;
+            feedback.innerHTML = '<div class="tb-notification tb-notification--' + kind + '">' + msg + '</div>';
+        }
+
+        function clearFeedback() {
+            if (feedback) feedback.innerHTML = '';
+        }
+
+        function open() {
+            clearFeedback();
+            if (importField) importField.value = '';
+            if (exportField) exportField.value = exportProgress();
+            modal.hidden = false;
+            document.body.classList.add('tb-modal-open');
+        }
+
+        function close() {
+            modal.hidden = true;
+            document.body.classList.remove('tb-modal-open');
+        }
+
+        trigger.addEventListener('click', open);
+
+        modal.querySelectorAll('[data-tb-progress-close]').forEach(function (el) {
+            el.addEventListener('click', close);
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !modal.hidden) close();
+        });
+
+        if (copyBtn && exportField) {
+            copyBtn.addEventListener('click', function () {
+                var value = exportField.value;
+                function done() {
+                    var prev = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied';
+                    setTimeout(function () { copyBtn.textContent = prev; }, 1500);
+                }
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(value).then(done, function () {
+                        exportField.select();
+                        try { document.execCommand('copy'); } catch (e) {}
+                        done();
+                    });
+                } else {
+                    exportField.select();
+                    try { document.execCommand('copy'); } catch (e) {}
+                    done();
+                }
+            });
+        }
+
+        if (importBtn) {
+            importBtn.addEventListener('click', function () {
+                var err = importProgress(importField ? importField.value : '');
+                if (err) {
+                    showFeedback('error', err);
+                    return;
+                }
+                showFeedback('success', 'Progress imported. Reloading…');
+                window.location.reload();
+            });
+        }
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function () {
+                if (!window.confirm('Reset all progress on this browser? This cannot be undone.')) return;
+                resetProgress();
+                showFeedback('success', 'Progress reset. Reloading…');
+                window.location.reload();
+            });
+        }
+    }
+
+    function initChrome() {
         markActiveNav();
+        initProgressModal();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initChrome);
+    } else {
+        initChrome();
     }
 
     window.TBProgress = {
@@ -667,6 +813,9 @@
         initCampaign: initCampaign,
         initStage: initStage,
         checkAnswer: checkAnswer,
-        revealHint: revealHint
+        revealHint: revealHint,
+        exportProgress: exportProgress,
+        importProgress: importProgress,
+        resetProgress: resetProgress
     };
 })();

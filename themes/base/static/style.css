@@ -211,6 +211,18 @@ a:hover {
 .tb-foot-links a { color: var(--tb-on-surface-variant); text-decoration: none; transition: color 0.15s; }
 .tb-foot-links a:hover { color: var(--tb-on-surface); }
 
+.tb-foot-progress-trigger {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: var(--tb-on-surface-variant);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+.tb-foot-progress-trigger:hover { color: var(--tb-on-surface); }
+
 .tb-foot-meta {
     text-align: right;
     font-family: var(--tb-f-mono);
@@ -573,6 +585,92 @@ a:hover {
     border: 1px solid rgba(248, 113, 113, 0.22);
     color: #f87171;
 }
+
+.tb-notification--success {
+    background: rgba(var(--tb-primary-rgb), 0.08);
+    border: 1px solid rgba(var(--tb-primary-rgb), 0.28);
+    color: var(--tb-primary);
+}
+
+/* ── Modal ────────────────────────────────────────────────── */
+.tb-modal[hidden] { display: none; }
+
+.tb-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.tb-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.tb-modal-dialog {
+    position: relative;
+    background: var(--tb-surface-low);
+    border: 1px solid rgba(var(--tb-primary-rgb), 0.18);
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 520px;
+    width: calc(100% - 2rem);
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.6);
+}
+
+.tb-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+}
+
+.tb-modal-title {
+    font-family: var(--tb-f-display);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--tb-text);
+    margin: 0;
+}
+
+.tb-modal-close {
+    background: none;
+    border: none;
+    color: var(--tb-on-surface-variant);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    transition: color 0.15s;
+}
+.tb-modal-close:hover { color: var(--tb-on-surface); }
+
+.tb-modal-section { margin-bottom: 1.5rem; }
+.tb-modal-section:last-of-type { margin-bottom: 0; }
+
+.tb-modal-section h3 {
+    font-family: var(--tb-f-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--tb-text);
+    margin: 0 0 0.25rem;
+}
+
+.tb-modal-hint {
+    font-size: 0.82rem;
+    color: var(--tb-on-surface-variant);
+    margin: 0 0 0.6rem;
+}
+
+body.tb-modal-open { overflow: hidden; }
 
 /* ── Hint boxes ───────────────────────────────────────────── */
 .tb-hint-box {

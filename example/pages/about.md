@@ -1,5 +1,5 @@
 ---
-title: About
+title: "About **Tricky Bits**"
 slug: about
 published_at: 2026-06-01T09:00:00Z
 ---
