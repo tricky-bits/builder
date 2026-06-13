@@ -47,7 +47,7 @@ func encodeStagePayloads(b *Builder, c *Campaign) (string, error) {
 			Title:      title,
 			Difficulty: s.Frontmatter.Difficulty,
 			ETA:        s.Frontmatter.ETAMinutes,
-			Href:       theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, current),
+			Href:       theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, current+".html"),
 		})
 		current = s.Frontmatter.Next
 	}

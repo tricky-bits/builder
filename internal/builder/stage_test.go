@@ -341,6 +341,107 @@ func TestStage_Validate(t *testing.T) {
 	}
 }
 
+// TestStage_ValidateFiles covers input/asset resolution against the campaign's
+// inputs/ and assets/ sibling directories and the body cross-check that every
+// referenced inputs/<x> or assets/<x> path is declared in the matching list.
+func TestStage_ValidateFiles(t *testing.T) {
+	// Lay out a campaign source tree:
+	//   <root>/stages/stage.md
+	//   <root>/inputs/data.json
+	//   <root>/assets/diagram.png
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "stages"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "inputs"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "assets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "inputs", "data.json"), []byte("{}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "assets", "diagram.png"), []byte("png"), 0o644))
+	stagePath := filepath.Join(root, "stages", "stage.md")
+
+	base := func() *Stage {
+		return &Stage{
+			Filename: stagePath,
+			Frontmatter: StageFrontmatter{
+				Title:      "Test Stage",
+				Author:     "alice",
+				Difficulty: 1,
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		mutate      func(*Stage)
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "declared files resolve in sibling dirs",
+			mutate:  func(s *Stage) { s.Frontmatter.Inputs = []string{"data.json"}; s.Frontmatter.Assets = []string{"diagram.png"} },
+			wantErr: false,
+		},
+		{
+			name:        "missing input file",
+			mutate:      func(s *Stage) { s.Frontmatter.Inputs = []string{"nope.json"} },
+			wantErr:     true,
+			errContains: "input file not found",
+		},
+		{
+			name:        "missing asset file",
+			mutate:      func(s *Stage) { s.Frontmatter.Assets = []string{"nope.png"} },
+			wantErr:     true,
+			errContains: "asset file not found",
+		},
+		{
+			name: "body asset ref must be declared",
+			mutate: func(s *Stage) {
+				s.Content = `<img src="assets/diagram.png">`
+			},
+			wantErr:     true,
+			errContains: "not declared in the assets list",
+		},
+		{
+			name: "body input ref must be declared",
+			mutate: func(s *Stage) {
+				s.Content = `<a href="inputs/data.json">d</a>`
+			},
+			wantErr:     true,
+			errContains: "not declared in the inputs list",
+		},
+		{
+			name: "declared body ref passes",
+			mutate: func(s *Stage) {
+				s.Frontmatter.Assets = []string{"diagram.png"}
+				s.Content = `<img src="assets/diagram.png">`
+			},
+			wantErr: false,
+		},
+		{
+			name: "declared-but-unreferenced is allowed",
+			mutate: func(s *Stage) {
+				s.Frontmatter.Assets = []string{"diagram.png"}
+				s.Content = `<p>no image here</p>`
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := base()
+			tt.mutate(s)
+			err := s.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestStage_ResolveAnswerHash(t *testing.T) {
 	plaintextHash := HashAnswer("welcome")
 	otherHash := HashAnswer("different")

@@ -65,7 +65,7 @@
                 <span class="tb-label">◆ Files</span>
                 <div class="tb-file-list">
                     {{range .Stage.Inputs}}
-                    <a class="tb-chip tb-chip--dim" href="{{urlJoin $.Site.BasePath "campaigns" $.Campaign.Slug $.Stage.Slug .}}">{{.}}</a>
+                    <a class="tb-chip tb-chip--dim" href="{{urlJoin $.Site.BasePath "campaigns" $.Campaign.Slug "inputs" .}}">{{.}}</a>
                     {{end}}
                 </div>
             </div>
@@ -93,7 +93,7 @@
                         {{if .Stage.EncCompletionMessage}}<div data-z data-q="{{.Stage.EncCompletionMessage}}"></div>{{else}}<p class="tb-fallback-text">Correct! Well done.</p>{{end}}
                     </div>
                     {{if .Stage.Next}}
-                    <a class="tb-btn tb-btn-primary tb-btn--next" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug .Stage.Next}}">
+                    <a class="tb-btn tb-btn-primary tb-btn--next" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug (printf "%s.html" .Stage.Next)}}">
                         Next Stage →
                     </a>
                     {{end}}
@@ -112,7 +112,7 @@
             {{/* Nav buttons */}}
             {{if .Stage.Next}}{{if eq .Stage.AnswerHash ""}}
             <div class="tb-nav-buttons">
-                <a class="tb-btn tb-btn-primary" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug .Stage.Next}}">Next Stage →</a>
+                <a class="tb-btn tb-btn-primary" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug (printf "%s.html" .Stage.Next)}}">Next Stage →</a>
             </div>
             {{end}}{{end}}
         </div>

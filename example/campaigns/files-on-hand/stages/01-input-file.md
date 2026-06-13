@@ -18,9 +18,10 @@ hints:
     text: "Open `data.json` and look at the value of the `codeword` field."
 ---
 
-This stage ships a file called `data.json`. Because it's listed under `inputs:`
-in the frontmatter, the builder copies it alongside the page and shows it as a
-**downloadable chip** in the stage info section.
+This stage ships a file called `data.json`. It lives in the campaign's `inputs/`
+directory; because it's listed under `inputs:` in the frontmatter, the builder
+copies it to `campaigns/<slug>/inputs/` and shows it as a **downloadable chip**
+in the stage info section.
 
 Download it and open it. You'll find a small JSON object:
 

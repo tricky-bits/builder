@@ -93,11 +93,31 @@ last_update_at: 2026-02-01T00:00:00Z
 Markdown body of the campaign intro…
 ```
 
-A campaign is a directory holding `campaign.md` and a `stages/` subdirectory.
+A campaign is a directory holding `campaign.md`, a `stages/` subdirectory, and
+optional `inputs/` and `assets/` subdirectories for stage files:
+
+```
+campaigns/<dir>/
+  campaign.md
+  featured.png        # optional campaign featured image
+  stages/<file>.md
+  inputs/             # downloadable files referenced by stages
+  assets/             # embedded files (images, …) referenced by stages
+```
+
 Drop a `featured.png` next to `campaign.md` to set its featured image; otherwise
 a deterministic theme fallback is chosen. Stages must form a single linear chain:
 exactly one stage marked `start: true`, linked by `next`, with no cycles or
 orphans.
+
+Stage input/asset files live in the campaign's `inputs/` and `assets/`
+directories (siblings of `stages/`), are copied once per campaign to
+`campaigns/<slug>/{inputs,assets}/`, and are deduplicated when shared across
+stages. Stage pages are written flat as `campaigns/<slug>/<stage>.html`, so a
+stage body references them with the relative paths `inputs/<file>` and
+`assets/<file>` — e.g. `![](assets/diagram.png)`. Every such reference must be
+declared in the matching `inputs:`/`assets:` list (a list entry need not be
+referenced, allowing files the player is meant to discover).
 
 ### Stage frontmatter (`campaigns/<dir>/stages/<file>.md`)
 
@@ -115,8 +135,8 @@ next: answering                 # slug of the next stage (omit on last)
 answer: 42                      # expected solution; shipped as a SHA-256 hash
 answer_sha256: 9c56...          # precomputed answer hash (ship without plaintext)
 completion_message: Solved!     # shown on stage completion
-inputs: [data.json]             # files copied + listed in the stage info section
-assets: [diagram.png]           # files copied but not listed
+inputs: [data.json]             # from inputs/; download chips + ref as inputs/<file>
+assets: [diagram.png]           # from assets/; not listed; ref as assets/<file>
 hints:                          # ordered, timed click-to-reveal hints
   - wait_seconds: 30
     text: Look at the headers.
