@@ -1,11 +1,50 @@
 package builder
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildFeaturedImage_RealImage(t *testing.T) {
+	// A real featured.<ext> next to the campaign source wins over any theme
+	// fallback. The real-image path returns before the theme manager is
+	// touched, so a nil themeMgr is fine here.
+	newBuilder := func() *Builder {
+		return &Builder{config: &Config{Site: SiteConfig{BasePath: "/docs"}}}
+	}
+
+	t.Run("detects single non-png featured image", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "featured.webp"), []byte("x"), 0o644))
+
+		c := &Campaign{SourceDir: dir, Frontmatter: CampaignFrontmatter{Slug: "demo"}}
+		require.NoError(t, c.buildFeaturedImage(newBuilder()))
+
+		assert.True(t, c.HasFeaturedImage)
+		assert.Equal(t, "/docs/campaigns/demo/featured.webp", c.FeaturedImageURL)
+		assert.Contains(t, c.Frontmatter.Assets, "featured.webp")
+	})
+
+	t.Run("preference order picks lightest when several present", func(t *testing.T) {
+		dir := t.TempDir()
+		for _, name := range []string{"featured.png", "featured.jpg", "featured.webp"} {
+			require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644))
+		}
+
+		c := &Campaign{SourceDir: dir, Frontmatter: CampaignFrontmatter{Slug: "demo"}}
+		require.NoError(t, c.buildFeaturedImage(newBuilder()))
+
+		// webp outranks jpg and png in FeaturedImageExtensions.
+		assert.Equal(t, "/docs/campaigns/demo/featured.webp", c.FeaturedImageURL)
+		assert.Contains(t, c.Frontmatter.Assets, "featured.webp")
+		assert.NotContains(t, c.Frontmatter.Assets, "featured.png")
+		assert.NotContains(t, c.Frontmatter.Assets, "featured.jpg")
+	})
+}
 
 func TestCampaign_Validate(t *testing.T) {
 	tests := []struct {

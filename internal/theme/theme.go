@@ -39,8 +39,9 @@ type Theme struct {
 	// (themes/<name>/static). Empty string means no static assets.
 	StaticDir string
 
-	// FeaturedImageFallbacks is the sorted list of *.png filenames discovered in
-	// <StaticDir>/fallbacks/, used as campaign featured-image fallbacks.
+	// FeaturedImageFallbacks is the sorted list of image filenames (any
+	// FeaturedImageExtensions extension) discovered in <StaticDir>/fallbacks/,
+	// used as campaign featured-image fallbacks.
 	// Nil when the directory is missing or empty.
 	FeaturedImageFallbacks []string
 

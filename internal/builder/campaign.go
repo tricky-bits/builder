@@ -139,7 +139,7 @@ type Campaign struct {
 	StartSlug string
 
 	// HasFeaturedImage is true whenever the campaign has any featured image
-	// to render — either a real featured.png next to the campaign source or
+	// to render — either a real featured.<ext> next to the campaign source or
 	// a theme-provided fallback assigned during the build.
 	HasFeaturedImage bool
 
@@ -342,21 +342,26 @@ func (c *Campaign) Build(b *Builder) error {
 }
 
 // buildFeaturedImage resolves the campaign's featured image, setting
-// HasFeaturedImage and FeaturedImageURL. A real featured.png next to the
-// campaign source wins: it is added to the asset list (so it gets copied) and
-// its absolute URL is resolved. Otherwise a deterministic theme fallback is
-// picked using the effective theme (campaign.theme > global.theme). When the
-// theme exposes no fallbacks, the flag stays false and templates fall back to
-// the gradient placeholder. Must run before buildCampaignPage (reads the
-// flag/URL) and buildCampaignAssets (copies featured.png).
+// HasFeaturedImage and FeaturedImageURL. A real featured.<ext> next to the
+// campaign source wins: extensions are tried in theme.FeaturedImageExtensions
+// preference order and the first match is used. It is added to the asset list
+// (so it gets copied) and its absolute URL is resolved. Otherwise a
+// deterministic theme fallback is picked using the effective theme
+// (campaign.theme > global.theme). When the theme exposes no fallbacks, the
+// flag stays false and templates fall back to the gradient placeholder. Must
+// run before buildCampaignPage (reads the flag/URL) and buildCampaignAssets
+// (copies the featured image).
 func (c *Campaign) buildFeaturedImage(b *Builder) error {
-	featuredPath := filepath.Join(c.SourceDir, "featured.png")
-	if _, err := os.Stat(featuredPath); err == nil {
-		if !slices.Contains(c.Frontmatter.Assets, "featured.png") {
-			c.Frontmatter.Assets = append(c.Frontmatter.Assets, "featured.png")
+	for _, ext := range theme.FeaturedImageExtensions {
+		name := "featured" + ext
+		if _, err := os.Stat(filepath.Join(c.SourceDir, name)); err != nil {
+			continue
+		}
+		if !slices.Contains(c.Frontmatter.Assets, name) {
+			c.Frontmatter.Assets = append(c.Frontmatter.Assets, name)
 		}
 		c.HasFeaturedImage = true
-		c.FeaturedImageURL = theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, "featured.png")
+		c.FeaturedImageURL = theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, name)
 		return nil
 	}
 
