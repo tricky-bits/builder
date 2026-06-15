@@ -93,11 +93,31 @@ last_update_at: 2026-02-01T00:00:00Z
 Markdown body of the campaign intro…
 ```
 
-A campaign is a directory holding `campaign.md` and a `stages/` subdirectory.
+A campaign is a directory holding `campaign.md`, a `stages/` subdirectory, and
+optional `inputs/` and `assets/` subdirectories for stage files:
+
+```
+campaigns/<dir>/
+  campaign.md
+  featured.png        # optional campaign featured image
+  stages/<file>.md
+  inputs/             # downloadable files referenced by stages
+  assets/             # embedded files (images, …) referenced by stages
+```
+
 Drop a `featured.png` next to `campaign.md` to set its featured image; otherwise
 a deterministic theme fallback is chosen. Stages must form a single linear chain:
 exactly one stage marked `start: true`, linked by `next`, with no cycles or
 orphans.
+
+Stage input/asset files live in the campaign's `inputs/` and `assets/`
+directories (siblings of `stages/`), are copied once per campaign to
+`campaigns/<slug>/{inputs,assets}/`, and are deduplicated when shared across
+stages. Stage pages are written flat as `campaigns/<slug>/<stage>.html`, so a
+stage body references them with the relative paths `inputs/<file>` and
+`assets/<file>` — e.g. `![](assets/diagram.png)`. Every such reference must be
+declared in the matching `inputs:`/`assets:` list (a list entry need not be
+referenced, allowing files the player is meant to discover).
 
 ### Stage frontmatter (`campaigns/<dir>/stages/<file>.md`)
 
@@ -113,9 +133,10 @@ theme: dark                     # optional override (stage > campaign > global)
 start: true                     # marks the campaign entry point (exactly one)
 next: answering                 # slug of the next stage (omit on last)
 answer: 42                      # expected solution; shipped as a SHA-256 hash
+answer_sha256: 9c56...          # precomputed answer hash (ship without plaintext)
 completion_message: Solved!     # shown on stage completion
-inputs: [data.json]             # files copied + listed in the stage info section
-assets: [diagram.png]           # files copied but not listed
+inputs: [data.json]             # from inputs/; download chips + ref as inputs/<file>
+assets: [diagram.png]           # from assets/; not listed; ref as assets/<file>
 hints:                          # ordered, timed click-to-reveal hints
   - wait_seconds: 30
     text: Look at the headers.
@@ -129,6 +150,14 @@ Markdown body of the puzzle…
 
 The `answer` is never shipped in clear text — only its trimmed, lowercased
 SHA-256 hash reaches the client for in-browser checking.
+
+To publish a campaign's source without revealing solutions, drop `answer` and
+supply `answer_sha256` instead: the SHA-256 hex digest of the trimmed, lowercased
+answer (the same value `answer` would produce). A stage may carry either field,
+both, or neither — neither is valid for informational stages that only link
+`next`. When both are present, the plaintext `answer` wins and a stale
+`answer_sha256` is logged as a build warning. A malformed `answer_sha256` (not 64
+lowercase hex chars) fails the build so a stage never ships silently unsolvable.
 
 ### Page frontmatter (`pages/<file>.md`)
 

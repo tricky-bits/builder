@@ -21,7 +21,7 @@
 
             {{/* Title */}}
             <h1 class="tb-display-lg tb-campaign-title">
-                {{.Campaign.Title}}
+                {{.Campaign.TitleHTML}}
             </h1>
 
             {{/* Meta row */}}
@@ -70,7 +70,7 @@
                         <div class="tb-progress-bar"><div class="tb-progress-bar-fill" id="tb-campaign-progress-fill"></div></div>
                     </div>
                     <div id="tb-campaign-action">
-                        <a class="tb-btn tb-btn-primary tb-btn-glow tb-btn--block" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug .Campaign.StageStartSlug}}">
+                        <a class="tb-btn tb-btn-primary tb-btn-glow tb-btn--block" href="{{urlJoin .Site.BasePath "campaigns" .Campaign.Slug (printf "%s.html" .Campaign.StageStartSlug)}}">
                             Begin campaign →
                         </a>
                     </div>

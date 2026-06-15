@@ -1,10 +1,45 @@
 package theme
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestDiscoverFallbacks_AcceptsAllFeaturedExtensions(t *testing.T) {
+	staticDir := t.TempDir()
+	fallbacksDir := filepath.Join(staticDir, "fallbacks")
+	require.NoError(t, os.MkdirAll(fallbacksDir, 0o755))
+
+	// One accepted file per supported extension, plus a non-image that must
+	// be ignored and a subdirectory that must be skipped.
+	for _, name := range []string{
+		"a.avif", "b.webp", "c.jpg", "d.jpeg", "e.png", "f.gif",
+		"g.PNG", // case-insensitive extension still accepted
+		"notes.txt", "cover.svg",
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(fallbacksDir, name), []byte("x"), 0o644))
+	}
+	require.NoError(t, os.MkdirAll(filepath.Join(fallbacksDir, "nested"), 0o755))
+
+	got, err := discoverFallbacks(staticDir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"a.avif", "b.webp", "c.jpg", "d.jpeg", "e.png", "f.gif", "g.PNG",
+	}, got)
+}
+
+func TestIsFeaturedImageExt(t *testing.T) {
+	for _, ext := range []string{".avif", ".webp", ".jpg", ".jpeg", ".png", ".gif", ".PNG", ".JpG"} {
+		assert.True(t, isFeaturedImageExt(ext), ext)
+	}
+	for _, ext := range []string{".txt", ".svg", ".bmp", "", ".pngx"} {
+		assert.False(t, isFeaturedImageExt(ext), ext)
+	}
+}
 
 func TestPickFallback(t *testing.T) {
 	t.Run("empty candidates returns empty string", func(t *testing.T) {

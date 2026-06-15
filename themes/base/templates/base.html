@@ -37,11 +37,56 @@
                 </div>
                 <div class="tb-foot-links">
                     {{range .Site.FooterItems}}<a href="{{if .External}}{{.Href}}{{else}}{{urlJoin $.Site.BasePath .Href}}{{end}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}>{{.Label}}</a>{{end}}
+                    <button type="button" class="tb-foot-progress-trigger" id="tb-progress-open">Progress</button>
                 </div>
                 <div class="tb-foot-meta">{{if .Site.Copyright}}{{.Site.Copyright}}{{end}}</div>
             </div>
         </div>
     </footer>
+
+    <div class="tb-modal" id="tb-progress-modal" hidden>
+        <div class="tb-modal-backdrop" data-tb-progress-close></div>
+        <div class="tb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="tb-progress-title">
+            <div class="tb-modal-head">
+                <h2 class="tb-modal-title" id="tb-progress-title">Your progress</h2>
+                <button type="button" class="tb-modal-close" data-tb-progress-close aria-label="Close">&times;</button>
+            </div>
+
+            <section class="tb-modal-section">
+                <h3>Export</h3>
+                <p class="tb-modal-hint">Copy this code to back up or transfer your progress.</p>
+                <div class="field has-addons">
+                    <div class="control is-expanded">
+                        <input type="text" id="tb-progress-export" class="input tb-answer-input tb-mono" readonly>
+                    </div>
+                    <div class="control">
+                        <button type="button" class="tb-btn tb-btn-secondary" id="tb-progress-copy">Copy</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tb-modal-section">
+                <h3>Import</h3>
+                <p class="tb-modal-hint">Paste a progress code to restore it. This overwrites current progress.</p>
+                <div class="field has-addons">
+                    <div class="control is-expanded">
+                        <input type="text" id="tb-progress-import" class="input tb-answer-input tb-mono" placeholder="Paste code…">
+                    </div>
+                    <div class="control">
+                        <button type="button" class="tb-btn tb-btn-primary" id="tb-progress-import-btn">Import</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tb-modal-section">
+                <h3>Reset</h3>
+                <p class="tb-modal-hint">Permanently clears all progress on this browser.</p>
+                <button type="button" class="tb-btn tb-btn-secondary" id="tb-progress-reset">Reset progress</button>
+            </section>
+
+            <div id="tb-progress-feedback"></div>
+        </div>
+    </div>
 
     <script src="{{urlJoin .Site.BasePath "/assets/base/progress.js"}}"></script>
     {{block "scripts" .}}{{end}}

@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -94,6 +95,12 @@ type StageFrontmatter struct {
 	// for validation or gating progression depending on the application logic.
 	Answer string `yaml:"answer,omitempty"`
 
+	// AnswerSHA256 is a precomputed SHA-256 hex digest of the answer, letting
+	// campaigns ship publicly without the plaintext answer. It must be the digest
+	// of the trimmed, lowercased answer (see HashAnswer). When Answer is also set,
+	// plaintext wins and this value is ignored (a mismatch is logged at build time).
+	AnswerSHA256 string `yaml:"answer_sha256,omitempty"`
+
 	// Hints is the ordered list of timed hints for the stage (optional).
 	Hints []HintFrontmatter `yaml:"hints,omitempty"`
 
@@ -106,15 +113,18 @@ type StageFrontmatter struct {
 	// CompletionMessage represents the message displayed on stage completion.
 	CompletionMessage string `yaml:"completion_message"`
 
-	// Inputs is a list of file names that should be copied alongside the stage.
-	// These files should be present in the same directory as the stage markdown file.
-	// TODO Discussion: Define where the input files should be stored.
+	// Inputs is a list of file names that are offered as downloads for the stage.
+	// The files must live in the campaign's inputs/ directory (a sibling of the
+	// stages/ directory). They are copied once to campaigns/<slug>/inputs/ and
+	// surfaced as download chips in the stage info section. Reference them from
+	// the body with a relative path, e.g. [data](inputs/data.json).
 	Inputs []string `yaml:"inputs,omitempty"`
 
-	// Assets is a list of file names (e.g., images) that should be copied alongside the stage.
-	// These files should be present in the same directory as the stage markdown file.
-	// Unlike inputs, assets are not displayed in the stage info section.
-	// TODO Discussion: Define where the assets files should be stored.
+	// Assets is a list of file names (e.g., images) used by the stage body.
+	// The files must live in the campaign's assets/ directory (a sibling of the
+	// stages/ directory). They are copied once to campaigns/<slug>/assets/.
+	// Unlike inputs, assets are not displayed as downloads; reference them from
+	// the body with a relative path, e.g. ![](assets/diagram.png).
 	Assets []string `yaml:"assets,omitempty"`
 }
 
@@ -213,6 +223,10 @@ func ReadStageFile(filename string) (*Stage, error) {
 		stage.Frontmatter.Slug = helpers.DeriveSlug(filename)
 	}
 
+	// Normalize a precomputed answer hash so it matches the lowercase hex emitted
+	// by HashAnswer and the in-browser SHA-256 comparison.
+	stage.Frontmatter.AnswerSHA256 = strings.ToLower(strings.TrimSpace(stage.Frontmatter.AnswerSHA256))
+
 	if err := stage.Validate(); err != nil {
 		return nil, err
 	}
@@ -237,6 +251,12 @@ func (s *Stage) Validate() error {
 		return fmt.Errorf("eta_minutes must be non-negative, got %d", s.Frontmatter.ETAMinutes)
 	}
 
+	// A precomputed answer hash must be a SHA-256 hex digest, otherwise the stage
+	// ships silently unsolvable. Absence stays legal (informational stages).
+	if s.Frontmatter.AnswerSHA256 != "" && !sha256HexRE.MatchString(s.Frontmatter.AnswerSHA256) {
+		return fmt.Errorf("answer_sha256 must be a 64-character SHA-256 hex digest, got %q", s.Frontmatter.AnswerSHA256)
+	}
+
 	// Validate hints
 	for i, hint := range s.Frontmatter.Hints {
 		if hint.WaitSeconds < 0 {
@@ -244,25 +264,84 @@ func (s *Stage) Validate() error {
 		}
 	}
 
-	// Validate input files exist
-	// TODO Discussion: Where are input / assert files located?
-	stageDir := filepath.Dir(s.Filename)
+	// Input and asset files live in the campaign's inputs/ and assets/
+	// directories, siblings of the stages/ directory holding this file:
+	//   campaigns/<slug>/stages/<stage>.md
+	//   campaigns/<slug>/inputs/<file>
+	//   campaigns/<slug>/assets/<file>
+	campaignDir := filepath.Dir(filepath.Dir(s.Filename))
+	inputsDir := filepath.Join(campaignDir, "inputs")
+	assetsDir := filepath.Join(campaignDir, "assets")
+
+	// Validate listed input files exist.
 	for _, inputFile := range s.Frontmatter.Inputs {
-		inputPath := filepath.Join(stageDir, inputFile)
+		inputPath := filepath.Join(inputsDir, inputFile)
 		if _, err := os.Stat(inputPath); os.IsNotExist(err) {
 			return fmt.Errorf("[%s] input file not found: %s", s.Filename, inputPath)
 		}
 	}
 
-	// Validate asset files exist
+	// Validate listed asset files exist.
 	for _, assetFile := range s.Frontmatter.Assets {
-		assetPath := filepath.Join(stageDir, assetFile)
+		assetPath := filepath.Join(assetsDir, assetFile)
 		if _, err := os.Stat(assetPath); os.IsNotExist(err) {
 			return fmt.Errorf("[%s] asset file not found: %s", s.Filename, assetPath)
 		}
 	}
 
+	// Cross-check body references against the declared lists. Every
+	// inputs/<x> or assets/<x> path in the rendered body must be declared in
+	// the matching frontmatter list (which guarantees it exists on disk and
+	// gets copied). The reverse is intentionally not enforced: a stage may
+	// ship a file that is not linked from the body (e.g. a file the player is
+	// meant to discover).
+	inputSet := make(map[string]bool, len(s.Frontmatter.Inputs))
+	for _, f := range s.Frontmatter.Inputs {
+		inputSet[f] = true
+	}
+	assetSet := make(map[string]bool, len(s.Frontmatter.Assets))
+	for _, f := range s.Frontmatter.Assets {
+		assetSet[f] = true
+	}
+	for _, m := range bodyFileRefRE.FindAllStringSubmatch(string(s.Content), -1) {
+		dir, file := m[1], m[2]
+		switch dir {
+		case "inputs":
+			if !inputSet[file] {
+				return fmt.Errorf("[%s] body references inputs/%s but it is not declared in the inputs list", s.Filename, file)
+			}
+		case "assets":
+			if !assetSet[file] {
+				return fmt.Errorf("[%s] body references assets/%s but it is not declared in the assets list", s.Filename, file)
+			}
+		}
+	}
+
 	return nil
+}
+
+// sha256HexRE matches a lowercase SHA-256 hex digest.
+var sha256HexRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// bodyFileRefRE matches relative inputs/<file> and assets/<file> references in
+// the rendered stage body's src/href attributes. Group 1 is the directory
+// (inputs or assets), group 2 is the file path within it.
+var bodyFileRefRE = regexp.MustCompile(`(?:src|href)="(inputs|assets)/([^"]+)"`)
+
+// ResolveAnswerHash returns the answer hash shipped to the client. Plaintext
+// wins: when Answer is set, its HashAnswer digest is used and any precomputed
+// AnswerSHA256 is ignored. mismatch reports that both were set but disagreed,
+// signalling a stale precomputed hash worth warning about. When Answer is empty
+// the precomputed AnswerSHA256 is returned as-is (empty for informational stages).
+func (s *Stage) ResolveAnswerHash() (hash string, mismatch bool) {
+	if s.Frontmatter.Answer != "" {
+		h := HashAnswer(s.Frontmatter.Answer)
+		if s.Frontmatter.AnswerSHA256 != "" && s.Frontmatter.AnswerSHA256 != h {
+			return h, true
+		}
+		return h, false
+	}
+	return s.Frontmatter.AnswerSHA256, false
 }
 
 // HashAnswer returns the SHA-256 hex digest of s after trimming spaces and
@@ -278,29 +357,28 @@ func HashAnswer(s string) string {
 }
 
 // Build renders the stage to an HTML file and copies input/asset files.
+//
+// The stage page is written flat as campaigns/<slug>/<stage>.html (not in a
+// per-stage directory) so its body can reference shared files with the simple
+// relative paths assets/<file> and inputs/<file>. Those files are copied once
+// per campaign into campaigns/<slug>/{assets,inputs}/; when several stages list
+// the same file, the copies share a destination and are harmlessly redundant.
 func (s *Stage) Build(b *Builder, c *Campaign) error {
-	basename := filepath.Base(s.Filename)
-
-	outputDir := filepath.Join(
+	campaignDir := filepath.Join(
 		b.config.Build.OutputDir,
 		"campaigns",
 		c.Frontmatter.Slug,
-		s.Frontmatter.Slug,
 	)
 
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		return fmt.Errorf("[%s] create stage output directory: %w", basename, err)
-	}
-
-	if err := s.buildStagePage(b, c, outputDir); err != nil {
+	if err := s.buildStagePage(b, c, campaignDir); err != nil {
 		return err
 	}
 
-	if err := s.buildStageInputs(b, outputDir); err != nil {
+	if err := s.buildStageInputs(b, c, campaignDir); err != nil {
 		return err
 	}
 
-	if err := s.buildStageAssets(b, outputDir); err != nil {
+	if err := s.buildStageAssets(b, c, campaignDir); err != nil {
 		return err
 	}
 
@@ -308,8 +386,9 @@ func (s *Stage) Build(b *Builder, c *Campaign) error {
 	return nil
 }
 
-// buildStagePage renders the stage HTML template and writes index.html to outputDir.
-func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error {
+// buildStagePage renders the stage HTML template and writes <stage>.html into
+// campaignDir.
+func (s *Stage) buildStagePage(b *Builder, c *Campaign, campaignDir string) error {
 	basename := filepath.Base(s.Filename)
 
 	t, err := b.themeMgr.Load(s.Frontmatter.Theme, c.Frontmatter.Theme, b.config.Build.Theme)
@@ -340,6 +419,7 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 
 	type stageData struct {
 		Title                string
+		TitleHTML            template.HTML
 		Slug                 string
 		Author               string
 		Tags                 []string
@@ -365,6 +445,12 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 		EncCompletionMessage string
 	}
 
+	answerHash, mismatch := s.ResolveAnswerHash()
+	if mismatch {
+		b.logger.Warn("answer_sha256 does not match plaintext answer; using plaintext",
+			"campaign", c.Frontmatter.Slug, "stage", s.Frontmatter.Slug)
+	}
+
 	encStageCompletion := ""
 	if s.CompletionMessage != "" {
 		encStageCompletion = b.encoder.Encode(string(s.CompletionMessage))
@@ -372,6 +458,15 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 	encCampaignCompletion := ""
 	if c.CompletionMessage != "" {
 		encCampaignCompletion = b.encoder.Encode(string(c.CompletionMessage))
+	}
+
+	stageTitleHTML, stageTitleText, err := markdown.HeroTitle(s.Frontmatter.Title)
+	if err != nil {
+		return fmt.Errorf("[%s] render stage hero title: %w", basename, err)
+	}
+	_, campaignTitleText, err := markdown.HeroTitle(c.Frontmatter.Title)
+	if err != nil {
+		return fmt.Errorf("[%s] render campaign hero title: %w", basename, err)
 	}
 
 	data := struct {
@@ -382,7 +477,8 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 	}{
 		Site: b.config.Site,
 		Stage: stageData{
-			Title:                s.Frontmatter.Title,
+			Title:                stageTitleText,
+			TitleHTML:            stageTitleHTML,
 			Slug:                 s.Frontmatter.Slug,
 			Author:               s.Frontmatter.Author,
 			Tags:                 s.Frontmatter.Tags,
@@ -391,14 +487,14 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 			Content:              s.Content,
 			EncCompletionMessage: encStageCompletion,
 			Next:                 s.Frontmatter.Next,
-			AnswerHash:           HashAnswer(s.Frontmatter.Answer),
+			AnswerHash:           answerHash,
 			Hints:                encodeHints(b.encoder, s.Hints),
 			Inputs:               s.Frontmatter.Inputs,
 			OrderIndex:           orderIndex,
 		},
 		Campaign: campaignData{
 			Slug:                 c.Frontmatter.Slug,
-			Title:                c.Frontmatter.Title,
+			Title:                campaignTitleText,
 			Category:             c.Frontmatter.Category,
 			StageStartSlug:       c.StartSlug,
 			StageCount:           len(c.Stages),
@@ -414,7 +510,11 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 		return fmt.Errorf("[%s] render stage: %w", basename, err)
 	}
 
-	outputPath := filepath.Join(outputDir, "index.html")
+	if err := os.MkdirAll(campaignDir, 0o755); err != nil {
+		return fmt.Errorf("[%s] create campaign output directory: %w", basename, err)
+	}
+
+	outputPath := filepath.Join(campaignDir, s.Frontmatter.Slug+".html")
 	if err := os.WriteFile(outputPath, buffer.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("[%s] write rendered stage: %w", basename, err)
 	}
@@ -422,14 +522,25 @@ func (s *Stage) buildStagePage(b *Builder, c *Campaign, outputDir string) error 
 	return nil
 }
 
-// buildStageInputs copies the stage's input files to outputDir.
-func (s *Stage) buildStageInputs(b *Builder, outputDir string) error {
+// buildStageInputs copies the stage's input files from the campaign source's
+// inputs/ directory to campaignDir/inputs/. Files shared by multiple stages
+// land at the same destination, so repeated copies are harmless.
+func (s *Stage) buildStageInputs(b *Builder, c *Campaign, campaignDir string) error {
+	if len(s.Frontmatter.Inputs) == 0 {
+		return nil
+	}
+
 	basename := filepath.Base(s.Filename)
-	stageDir := filepath.Dir(s.Filename)
+	srcDir := filepath.Join(c.SourceDir, "inputs")
+	dstDir := filepath.Join(campaignDir, "inputs")
+
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return fmt.Errorf("[%s] create inputs output directory: %w", basename, err)
+	}
 
 	for _, inputFile := range s.Frontmatter.Inputs {
-		srcPath := filepath.Join(stageDir, inputFile)
-		dstPath := filepath.Join(outputDir, inputFile)
+		srcPath := filepath.Join(srcDir, inputFile)
+		dstPath := filepath.Join(dstDir, inputFile)
 		if err := helpers.CopyFile(srcPath, dstPath); err != nil {
 			return fmt.Errorf("[%s] copy input file %q: %w", basename, inputFile, err)
 		}
@@ -439,14 +550,25 @@ func (s *Stage) buildStageInputs(b *Builder, outputDir string) error {
 	return nil
 }
 
-// buildStageAssets copies the stage's asset files to outputDir.
-func (s *Stage) buildStageAssets(b *Builder, outputDir string) error {
+// buildStageAssets copies the stage's asset files from the campaign source's
+// assets/ directory to campaignDir/assets/. Files shared by multiple stages
+// land at the same destination, so repeated copies are harmless.
+func (s *Stage) buildStageAssets(b *Builder, c *Campaign, campaignDir string) error {
+	if len(s.Frontmatter.Assets) == 0 {
+		return nil
+	}
+
 	basename := filepath.Base(s.Filename)
-	stageDir := filepath.Dir(s.Filename)
+	srcDir := filepath.Join(c.SourceDir, "assets")
+	dstDir := filepath.Join(campaignDir, "assets")
+
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return fmt.Errorf("[%s] create assets output directory: %w", basename, err)
+	}
 
 	for _, assetFile := range s.Frontmatter.Assets {
-		srcPath := filepath.Join(stageDir, assetFile)
-		dstPath := filepath.Join(outputDir, assetFile)
+		srcPath := filepath.Join(srcDir, assetFile)
+		dstPath := filepath.Join(dstDir, assetFile)
 		if err := helpers.CopyFile(srcPath, dstPath); err != nil {
 			return fmt.Errorf("[%s] copy asset file %q: %w", basename, assetFile, err)
 		}

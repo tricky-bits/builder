@@ -38,12 +38,16 @@ func encodeStagePayloads(b *Builder, c *Campaign) (string, error) {
 		if !ok {
 			break
 		}
+		_, title, err := markdown.HeroTitle(s.Frontmatter.Title)
+		if err != nil {
+			return "", err
+		}
 		payloads = append(payloads, stagePayload{
 			Slug:       current,
-			Title:      s.Frontmatter.Title,
+			Title:      title,
 			Difficulty: s.Frontmatter.Difficulty,
 			ETA:        s.Frontmatter.ETAMinutes,
-			Href:       theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, current),
+			Href:       theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, current+".html"),
 		})
 		current = s.Frontmatter.Next
 	}
@@ -135,7 +139,7 @@ type Campaign struct {
 	StartSlug string
 
 	// HasFeaturedImage is true whenever the campaign has any featured image
-	// to render — either a real featured.png next to the campaign source or
+	// to render — either a real featured.<ext> next to the campaign source or
 	// a theme-provided fallback assigned during the build.
 	HasFeaturedImage bool
 
@@ -338,21 +342,26 @@ func (c *Campaign) Build(b *Builder) error {
 }
 
 // buildFeaturedImage resolves the campaign's featured image, setting
-// HasFeaturedImage and FeaturedImageURL. A real featured.png next to the
-// campaign source wins: it is added to the asset list (so it gets copied) and
-// its absolute URL is resolved. Otherwise a deterministic theme fallback is
-// picked using the effective theme (campaign.theme > global.theme). When the
-// theme exposes no fallbacks, the flag stays false and templates fall back to
-// the gradient placeholder. Must run before buildCampaignPage (reads the
-// flag/URL) and buildCampaignAssets (copies featured.png).
+// HasFeaturedImage and FeaturedImageURL. A real featured.<ext> next to the
+// campaign source wins: extensions are tried in theme.FeaturedImageExtensions
+// preference order and the first match is used. It is added to the asset list
+// (so it gets copied) and its absolute URL is resolved. Otherwise a
+// deterministic theme fallback is picked using the effective theme
+// (campaign.theme > global.theme). When the theme exposes no fallbacks, the
+// flag stays false and templates fall back to the gradient placeholder. Must
+// run before buildCampaignPage (reads the flag/URL) and buildCampaignAssets
+// (copies the featured image).
 func (c *Campaign) buildFeaturedImage(b *Builder) error {
-	featuredPath := filepath.Join(c.SourceDir, "featured.png")
-	if _, err := os.Stat(featuredPath); err == nil {
-		if !slices.Contains(c.Frontmatter.Assets, "featured.png") {
-			c.Frontmatter.Assets = append(c.Frontmatter.Assets, "featured.png")
+	for _, ext := range theme.FeaturedImageExtensions {
+		name := "featured" + ext
+		if _, err := os.Stat(filepath.Join(c.SourceDir, name)); err != nil {
+			continue
+		}
+		if !slices.Contains(c.Frontmatter.Assets, name) {
+			c.Frontmatter.Assets = append(c.Frontmatter.Assets, name)
 		}
 		c.HasFeaturedImage = true
-		c.FeaturedImageURL = theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, "featured.png")
+		c.FeaturedImageURL = theme.JoinURL(b.config.Site.BasePath, "campaigns", c.Frontmatter.Slug, name)
 		return nil
 	}
 
@@ -396,6 +405,7 @@ func (c *Campaign) buildCampaignPage(b *Builder, outputDir string) error {
 	type campaignData struct {
 		Slug                 string
 		Title                string
+		TitleHTML            template.HTML
 		Category             string
 		Theme                string
 		Content              template.HTML
@@ -420,6 +430,11 @@ func (c *Campaign) buildCampaignPage(b *Builder, outputDir string) error {
 		encCompletion = b.encoder.Encode(string(c.CompletionMessage))
 	}
 
+	titleHTML, titleText, err := markdown.HeroTitle(c.Frontmatter.Title)
+	if err != nil {
+		return fmt.Errorf("[%s] render campaign hero title: %w", c.Frontmatter.Slug, err)
+	}
+
 	data := struct {
 		Site     SiteConfig
 		Campaign campaignData
@@ -428,7 +443,8 @@ func (c *Campaign) buildCampaignPage(b *Builder, outputDir string) error {
 		Site: b.config.Site,
 		Campaign: campaignData{
 			Slug:                 c.Frontmatter.Slug,
-			Title:                c.Frontmatter.Title,
+			Title:                titleText,
+			TitleHTML:            titleHTML,
 			Category:             c.Frontmatter.Category,
 			Theme:                c.Frontmatter.Theme,
 			Content:              c.Content,

@@ -3,6 +3,9 @@ package builder
 import (
 	"encoding/base64"
 	"html/template"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -246,6 +249,59 @@ func TestStage_Validate(t *testing.T) {
 			errContains: "hint 1: wait_seconds must be non-negative",
 		},
 		{
+			name: "answer-less stage is valid (informational)",
+			stage: &Stage{
+				Filename: "test.md",
+				Frontmatter: StageFrontmatter{
+					Title:      "Test Stage",
+					Author:     "Test Author",
+					Difficulty: 1,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid answer_sha256",
+			stage: &Stage{
+				Filename: "test.md",
+				Frontmatter: StageFrontmatter{
+					Title:        "Test Stage",
+					Author:       "Test Author",
+					Difficulty:   1,
+					AnswerSHA256: HashAnswer("welcome"),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "answer_sha256 too short",
+			stage: &Stage{
+				Filename: "test.md",
+				Frontmatter: StageFrontmatter{
+					Title:        "Test Stage",
+					Author:       "Test Author",
+					Difficulty:   1,
+					AnswerSHA256: "abc123",
+				},
+			},
+			wantErr:     true,
+			errContains: "answer_sha256 must be a 64-character SHA-256 hex digest",
+		},
+		{
+			name: "answer_sha256 with non-hex characters",
+			stage: &Stage{
+				Filename: "test.md",
+				Frontmatter: StageFrontmatter{
+					Title:        "Test Stage",
+					Author:       "Test Author",
+					Difficulty:   1,
+					AnswerSHA256: "zzzz567890123456789012345678901234567890123456789012345678901234",
+				},
+			},
+			wantErr:     true,
+			errContains: "answer_sha256 must be a 64-character SHA-256 hex digest",
+		},
+		{
 			name: "stage with all optional fields valid",
 			stage: &Stage{
 				Filename: "test.md",
@@ -283,6 +339,187 @@ func TestStage_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStage_ValidateFiles covers input/asset resolution against the campaign's
+// inputs/ and assets/ sibling directories and the body cross-check that every
+// referenced inputs/<x> or assets/<x> path is declared in the matching list.
+func TestStage_ValidateFiles(t *testing.T) {
+	// Lay out a campaign source tree:
+	//   <root>/stages/stage.md
+	//   <root>/inputs/data.json
+	//   <root>/assets/diagram.png
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "stages"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "inputs"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "assets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "inputs", "data.json"), []byte("{}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "assets", "diagram.png"), []byte("png"), 0o644))
+	stagePath := filepath.Join(root, "stages", "stage.md")
+
+	base := func() *Stage {
+		return &Stage{
+			Filename: stagePath,
+			Frontmatter: StageFrontmatter{
+				Title:      "Test Stage",
+				Author:     "alice",
+				Difficulty: 1,
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		mutate      func(*Stage)
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "declared files resolve in sibling dirs",
+			mutate:  func(s *Stage) { s.Frontmatter.Inputs = []string{"data.json"}; s.Frontmatter.Assets = []string{"diagram.png"} },
+			wantErr: false,
+		},
+		{
+			name:        "missing input file",
+			mutate:      func(s *Stage) { s.Frontmatter.Inputs = []string{"nope.json"} },
+			wantErr:     true,
+			errContains: "input file not found",
+		},
+		{
+			name:        "missing asset file",
+			mutate:      func(s *Stage) { s.Frontmatter.Assets = []string{"nope.png"} },
+			wantErr:     true,
+			errContains: "asset file not found",
+		},
+		{
+			name: "body asset ref must be declared",
+			mutate: func(s *Stage) {
+				s.Content = `<img src="assets/diagram.png">`
+			},
+			wantErr:     true,
+			errContains: "not declared in the assets list",
+		},
+		{
+			name: "body input ref must be declared",
+			mutate: func(s *Stage) {
+				s.Content = `<a href="inputs/data.json">d</a>`
+			},
+			wantErr:     true,
+			errContains: "not declared in the inputs list",
+		},
+		{
+			name: "declared body ref passes",
+			mutate: func(s *Stage) {
+				s.Frontmatter.Assets = []string{"diagram.png"}
+				s.Content = `<img src="assets/diagram.png">`
+			},
+			wantErr: false,
+		},
+		{
+			name: "declared-but-unreferenced is allowed",
+			mutate: func(s *Stage) {
+				s.Frontmatter.Assets = []string{"diagram.png"}
+				s.Content = `<p>no image here</p>`
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := base()
+			tt.mutate(s)
+			err := s.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestStage_ResolveAnswerHash(t *testing.T) {
+	plaintextHash := HashAnswer("welcome")
+	otherHash := HashAnswer("different")
+
+	tests := []struct {
+		name         string
+		answer       string
+		answerSHA256 string
+		wantHash     string
+		wantMismatch bool
+	}{
+		{
+			name:     "neither set yields empty (informational)",
+			wantHash: "",
+		},
+		{
+			name:     "plaintext only derives hash",
+			answer:   "welcome",
+			wantHash: plaintextHash,
+		},
+		{
+			name:         "hash only returns stored hash",
+			answerSHA256: plaintextHash,
+			wantHash:     plaintextHash,
+		},
+		{
+			name:         "both matching: plaintext wins, no mismatch",
+			answer:       "welcome",
+			answerSHA256: plaintextHash,
+			wantHash:     plaintextHash,
+			wantMismatch: false,
+		},
+		{
+			name:         "both disagreeing: plaintext wins, mismatch flagged",
+			answer:       "welcome",
+			answerSHA256: otherHash,
+			wantHash:     plaintextHash,
+			wantMismatch: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Stage{Frontmatter: StageFrontmatter{
+				Answer:       tt.answer,
+				AnswerSHA256: tt.answerSHA256,
+			}}
+			gotHash, gotMismatch := s.ResolveAnswerHash()
+			assert.Equal(t, tt.wantHash, gotHash)
+			assert.Equal(t, tt.wantMismatch, gotMismatch)
+		})
+	}
+}
+
+// TestStage_AnswerSHA256Normalized asserts ReadStageFile lowercases/trims a
+// precomputed hash so it matches the lowercase hex the client compares against.
+func TestStage_AnswerSHA256Normalized(t *testing.T) {
+	hash := HashAnswer("welcome")
+	upper := strings.ToUpper(hash)
+	require.NotEqual(t, hash, upper)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "stage.md")
+	content := "---\n" +
+		"title: Test\n" +
+		"author: alice\n" +
+		"difficulty: 1\n" +
+		"answer_sha256: \"  " + upper + "  \"\n" +
+		"---\nBody\n"
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+
+	stage, err := ReadStageFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, hash, stage.Frontmatter.AnswerSHA256)
+
+	gotHash, mismatch := stage.ResolveAnswerHash()
+	assert.Equal(t, hash, gotHash)
+	assert.False(t, mismatch)
 }
 
 func TestEncodeHints(t *testing.T) {

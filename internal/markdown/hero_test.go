@@ -8,44 +8,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRenderHeroTitle(t *testing.T) {
+func TestHeroTitle(t *testing.T) {
 	tests := []struct {
-		name string
-		in   string
-		want template.HTML
+		name     string
+		in       string
+		wantHTML template.HTML
+		wantText string
 	}{
 		{
-			name: "bold segment becomes gradient span",
-			in:   "DECODE **the unsolvable.**",
-			want: `DECODE <span class="tb-gradient">the unsolvable.</span>`,
+			name:     "bold segment becomes gradient span, plain text strips markers",
+			in:       "DECODE **the unsolvable.**",
+			wantHTML: `DECODE <span class="tb-gradient">the unsolvable.</span>`,
+			wantText: "DECODE the unsolvable.",
 		},
 		{
-			name: "no bold renders plain with no gradient span",
-			in:   "DECODE the unsolvable",
-			want: "DECODE the unsolvable",
+			name:     "no bold renders plain in both forms",
+			in:       "DECODE the unsolvable",
+			wantHTML: "DECODE the unsolvable",
+			wantText: "DECODE the unsolvable",
 		},
 		{
-			name: "multiple bold segments all become gradient spans",
-			in:   "**A** middle **B**",
-			want: `<span class="tb-gradient">A</span> middle <span class="tb-gradient">B</span>`,
+			name:     "multiple bold segments all become gradient spans",
+			in:       "**A** middle **B**",
+			wantHTML: `<span class="tb-gradient">A</span> middle <span class="tb-gradient">B</span>`,
+			wantText: "A middle B",
 		},
 		{
-			name: "empty input yields empty html",
-			in:   "",
-			want: "",
+			name:     "ampersand stays escaped in html, unescaped in text",
+			in:       "Salt **&** Pepper",
+			wantHTML: `Salt <span class="tb-gradient">&amp;</span> Pepper`,
+			wantText: "Salt & Pepper",
 		},
 		{
-			name: "whitespace only yields empty html",
-			in:   "   \n  ",
-			want: "",
+			name:     "empty input yields zero values",
+			in:       "",
+			wantHTML: "",
+			wantText: "",
+		},
+		{
+			name:     "whitespace only yields zero values",
+			in:       "   \n  ",
+			wantHTML: "",
+			wantText: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := RenderHeroTitle(tt.in)
+			gotHTML, gotText, err := HeroTitle(tt.in)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantHTML, gotHTML)
+			assert.Equal(t, tt.wantText, gotText)
 		})
 	}
 }

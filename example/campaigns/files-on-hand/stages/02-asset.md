@@ -1,5 +1,5 @@
 ---
-title: An Embedded Asset
+title: An **Embedded** Asset
 author: Margaret
 slug: asset-image
 difficulty: 2
@@ -8,7 +8,7 @@ next: ""
 tags:
   - files
   - assets
-answer: "diagram"
+answer: "diagramé"
 completion_message: "Asset embedded and displayed — that's a wrap."
 assets:
   - diagram.png
@@ -17,14 +17,15 @@ hints:
     text: "The answer is the kind of image embedded below."
 ---
 
-This stage lists `diagram.png` under `assets:`. Assets are copied next to the
-stage just like inputs, but they are **not** shown as downloads — you reference
-them from the body. Here it is, embedded with a relative path:
+This stage lists `diagram.png` under `assets:`. The file lives in the campaign's
+`assets/` directory and is copied once to `campaigns/<slug>/assets/`. Assets are
+**not** shown as downloads — you reference them from the body. Here it is,
+embedded with a relative path:
 
-![A supporting diagram](diagram.png)
+![A supporting diagram](assets/diagram.png)
 
-Because the image sits beside this page in the output, a relative `diagram.png`
-path resolves correctly.
+Because the stage page sits at `campaigns/<slug>/asset-image.html`, a relative
+`assets/diagram.png` path resolves to the shared assets directory.
 
 The kind of image shown above is a **diagram**.
 
