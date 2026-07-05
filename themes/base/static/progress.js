@@ -531,6 +531,8 @@
         var row = document.createElement('a');
         row.className = 'tb-recessed-row';
         row.href = href;
+        var tags = card.getAttribute('data-tb-tags');
+        if (tags) row.setAttribute('data-tb-tags', tags);
 
         var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         icon.setAttribute('class', 'tb-recessed-row-icon');
@@ -573,28 +575,28 @@
     function initHome(opts) {
         if (!opts) return;
         var featured = Array.isArray(opts.featured) ? opts.featured : [];
-        var nonFeatured = Array.isArray(opts.nonFeatured) ? opts.nonFeatured : [];
-
-        var availableGrid = document.getElementById('tb-available-grid');
-        var availableSection = document.getElementById('tb-available');
-        var completedSection = document.getElementById('tb-completed');
-        var completedList = document.getElementById('tb-completed-list');
 
         featured.forEach(function (c) {
             if (!c || !c.id) return;
             var card = document.querySelector('.tb-card--featured[data-tb-campaign-id="' + c.id + '"]');
             if (!card) return;
-            if (isCampaignCompleted(c.id)) {
-                addRibbon(card, 'completed');
-                if (completedList) {
-                    completedList.appendChild(makeCompletedRow(card));
-                }
-            } else if (hasCampaignProgress(c.id, c.order)) {
+            if (!isCampaignCompleted(c.id) && hasCampaignProgress(c.id, c.order)) {
                 addRibbon(card, 'in-progress');
             }
         });
 
-        nonFeatured.forEach(function (c) {
+        renumberSections();
+    }
+
+    function initCampaigns(opts) {
+        if (!opts) return;
+        var campaigns = Array.isArray(opts.campaigns) ? opts.campaigns : [];
+
+        var availableSection = document.getElementById('tb-available');
+        var completedSection = document.getElementById('tb-completed');
+        var completedList = document.getElementById('tb-completed-list');
+
+        campaigns.forEach(function (c) {
             if (!c || !c.id) return;
             var card = document.querySelector('.tb-card--available[data-tb-campaign-id="' + c.id + '"]');
             if (!card) return;
@@ -613,6 +615,7 @@
             }
         });
 
+        var availableGrid = document.getElementById('tb-available-grid');
         if (availableGrid && availableSection) {
             if (!availableGrid.querySelector('.tb-card--available')) {
                 availableSection.style.display = 'none';
@@ -625,6 +628,65 @@
         }
 
         renumberSections();
+        initTagFilter();
+    }
+
+    function initTagFilter() {
+        var chips = document.querySelectorAll('#tb-tag-filter [data-tb-tag]');
+        var clearBtn = document.getElementById('tb-tag-clear');
+        if (!chips.length) return;
+
+        var activeTags = new Set();
+
+        function apply() {
+            document.querySelectorAll('[data-tb-tags]').forEach(function (el) {
+                var tags;
+                try {
+                    tags = JSON.parse(el.getAttribute('data-tb-tags') || '[]');
+                } catch (e) {
+                    tags = [];
+                }
+                var visible = activeTags.size === 0 || tags.some(function (t) { return activeTags.has(t); });
+                var target = el.closest('.column') || el;
+                target.style.display = visible ? '' : 'none';
+            });
+
+            ['tb-available', 'tb-completed'].forEach(function (sectionId) {
+                var section = document.getElementById(sectionId);
+                if (!section) return;
+                var hasVisible = false;
+                section.querySelectorAll('[data-tb-tags]').forEach(function (el) {
+                    var target = el.closest('.column') || el;
+                    if (target.style.display !== 'none') hasVisible = true;
+                });
+                var hasAny = section.querySelectorAll('[data-tb-tags]').length > 0;
+                if (hasAny) section.style.display = hasVisible ? '' : 'none';
+            });
+
+            if (clearBtn) clearBtn.style.display = activeTags.size > 0 ? '' : 'none';
+        }
+
+        chips.forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                var tag = chip.getAttribute('data-tb-tag');
+                if (activeTags.has(tag)) {
+                    activeTags.delete(tag);
+                    chip.classList.remove('tb-chip--active');
+                } else {
+                    activeTags.add(tag);
+                    chip.classList.add('tb-chip--active');
+                }
+                apply();
+            });
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                activeTags.clear();
+                chips.forEach(function (chip) { chip.classList.remove('tb-chip--active'); });
+                apply();
+            });
+        }
     }
 
     function renumberSections() {
@@ -810,6 +872,7 @@
 
     window.TBProgress = {
         initHome: initHome,
+        initCampaigns: initCampaigns,
         initCampaign: initCampaign,
         initStage: initStage,
         checkAnswer: checkAnswer,

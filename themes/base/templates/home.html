@@ -38,37 +38,8 @@
     </section>
     {{end}}
 
-    {{if .NonFeatured}}
-    <section class="tb-block tb-block--available" id="tb-available">
-        <p class="tb-label" style="margin-bottom: 8px;">// <span class="tb-section-num">{{if .Featured}}02{{else}}01{{end}}</span></p>
-        <h2 class="tb-section-title">Available campaigns</h2>
-        <div class="columns is-multiline" id="tb-available-grid">
-            {{range .NonFeatured}}
-            <div class="column is-4">
-                <a class="tb-card tb-card--available"
-                    href="{{urlJoin $.Site.BasePath "campaigns" .Slug}}"
-                    data-tb-campaign-id="{{.Slug}}">
-                    <div class="tb-card-body">
-                        <p class="tb-card-title">{{.Title}}</p>
-                        <div class="tb-chips">
-                            {{if .Category}}<span class="tb-chip tb-chip--dim">{{.Category}}</span>{{end}}
-                            {{if gt .ETAMinutes 0}}<span class="tb-chip tb-chip--dim">~{{.ETAMinutes}}m</span>{{end}}
-                            <span class="tb-chip tb-chip--dim">{{.StageCount}} stages</span>
-                            {{if gt .Difficulty 0}}<span class="tb-chip tb-chip--dim">Difficulty: {{.Difficulty}}/5</span>{{end}}
-                        </div>
-                        {{if .Abstract}}<div class="tb-card-abstract tb-clamp-2">{{.Abstract}}</div>{{end}}
-                    </div>
-                </a>
-            </div>
-            {{end}}
-        </div>
-    </section>
-    {{end}}
-
-    <section class="tb-block tb-block--completed" id="tb-completed" style="display:none;">
-        <p class="tb-label" style="margin-bottom: 8px;">// <span class="tb-section-num">03</span></p>
-        <h2 class="tb-section-title">Completed campaigns</h2>
-        <div class="tb-list" id="tb-completed-list"></div>
+    <section class="tb-block tb-block--browse-all" style="text-align: center;">
+        <a class="tb-btn tb-btn-primary tb-btn--lg" href="{{urlJoin .Site.BasePath "campaigns"}}">Browse all {{.TotalCount}} campaigns →</a>
     </section>
 </div>
 {{end}}
@@ -78,9 +49,6 @@
 TBProgress.initHome({
     featured: [
         {{range $i, $c := .Featured}}{{if $i}},{{end}}{ id: {{$c.Slug | json}}, order: {{$c.StageOrderedSlugs | json}} }{{end}}
-    ],
-    nonFeatured: [
-        {{range $i, $c := .NonFeatured}}{{if $i}},{{end}}{ id: {{$c.Slug | json}}, order: {{$c.StageOrderedSlugs | json}} }{{end}}
     ]
 });
 </script>

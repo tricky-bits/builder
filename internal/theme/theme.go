@@ -111,6 +111,7 @@ func (t *Theme) CopyAssets(outputDir string) error {
 // is used during theme validation.
 var requiredTemplates = []string{
 	"home.html",
+	"campaigns.html",
 	"campaign.html",
 	"stage.html",
 	"404.html",
