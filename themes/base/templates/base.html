@@ -17,6 +17,7 @@
             <span>{{.Site.Name}}</span>
         </a>
         <div class="tb-nav-menu">
+            <a href="{{urlJoin .Site.BasePath "campaigns"}}">Campaigns</a>
             {{range .Site.NavItems}}
             <a href="{{if .External}}{{.Href}}{{else}}{{urlJoin $.Site.BasePath .Href}}{{end}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}>{{.Label}}</a>
             {{end}}

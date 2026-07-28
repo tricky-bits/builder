@@ -91,6 +91,10 @@ func (b *Builder) Build() error {
 		return err
 	}
 
+	if err := b.BuildCampaignsPage(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -118,4 +122,9 @@ func (b *Builder) BuildAllPages() error {
 // BuildIndexPage renders the site index page.
 func (b *Builder) BuildIndexPage() error {
 	return RenderIndexPage(b)
+}
+
+// BuildCampaignsPage renders the "/campaigns" listing page.
+func (b *Builder) BuildCampaignsPage() error {
+	return RenderCampaignsPage(b)
 }

@@ -1,0 +1,11 @@
+{{define "title"}}All campaigns{{end}}
+{{define "content"}}
+<main>
+{{range .Campaigns}}
+<a class="card" href="{{urlJoin $.Site.BasePath "campaigns" .Slug}}" data-slug="{{.Slug}}" data-tags="{{.Tags | json}}">
+  <p>{{.Title}}</p>
+</a>
+{{end}}
+</main>
+{{end}}
+{{template "base.html" .}}

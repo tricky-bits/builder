@@ -6,8 +6,6 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
-	"sort"
-	"time"
 
 	"github.com/tricky-bits/builder/internal/markdown"
 )
@@ -19,86 +17,9 @@ func RenderIndexPage(b *Builder) error {
 		return fmt.Errorf("[index.md] load theme: %w", err)
 	}
 
-	// Sort campaigns by Order then Slug.
-	sorted := make([]*Campaign, 0, len(b.campaigns))
-	for _, c := range b.campaigns {
-		sorted = append(sorted, c)
-	}
-	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].Frontmatter.Order != sorted[j].Frontmatter.Order {
-			return sorted[i].Frontmatter.Order < sorted[j].Frontmatter.Order
-		}
-		return sorted[i].Frontmatter.Slug < sorted[j].Frontmatter.Slug
-	})
-
-	type campaignItem struct {
-		Slug              string
-		Title             string
-		Category          string
-		Abstract          template.HTML
-		Order             int
-		Difficulty        int
-		ETAMinutes        int
-		Tags              []string
-		PublishedAt       *time.Time
-		LastUpdatedAt     *time.Time
-		StageCount        int
-		StageStartSlug    string
-		StageOrderedSlugs []string
-		HasFeaturedImage  bool
-		FeaturedImageURL  string
-	}
-
-	featured := make([]campaignItem, 0, len(sorted))
-	nonFeatured := make([]campaignItem, 0, len(sorted))
-	for _, c := range sorted {
-		var etaMinutes int
-		tagsSet := make(map[string]bool)
-		for _, s := range c.Stages {
-			etaMinutes += s.Frontmatter.ETAMinutes
-			for _, tag := range s.Frontmatter.Tags {
-				tagsSet[tag] = true
-			}
-		}
-
-		stageOrderedSlugs := make([]string, 0, len(c.Stages))
-		current := c.StartSlug
-		for current != "" {
-			stageOrderedSlugs = append(stageOrderedSlugs, current)
-			stage, ok := c.Stages[current]
-			if !ok {
-				break
-			}
-			current = stage.Frontmatter.Next
-		}
-
-		_, title, err := markdown.HeroTitle(c.Frontmatter.Title)
-		if err != nil {
-			return fmt.Errorf("[index.md] render campaign hero title: %w", err)
-		}
-
-		item := campaignItem{
-			Slug:              c.Frontmatter.Slug,
-			Title:             title,
-			Category:          c.Frontmatter.Category,
-			Abstract:          c.Abstract,
-			Order:             c.Frontmatter.Order,
-			Difficulty:        c.Frontmatter.Difficulty,
-			ETAMinutes:        etaMinutes,
-			Tags:              sortedStringSet(tagsSet),
-			PublishedAt:       c.Frontmatter.PublishedAt,
-			LastUpdatedAt:     c.Frontmatter.LastUpdatedAt,
-			StageCount:        len(c.Stages),
-			StageStartSlug:    c.StartSlug,
-			StageOrderedSlugs: stageOrderedSlugs,
-			HasFeaturedImage:  c.HasFeaturedImage,
-			FeaturedImageURL:  c.FeaturedImageURL,
-		}
-		if c.Frontmatter.Featured {
-			featured = append(featured, item)
-		} else {
-			nonFeatured = append(nonFeatured, item)
-		}
+	all, featured, _, _, err := buildCampaignItems(b)
+	if err != nil {
+		return fmt.Errorf("[index.md] build campaign items: %w", err)
 	}
 
 	heroTitleHTML, _, err := markdown.HeroTitle(b.config.Site.IndexTitle)
@@ -112,12 +33,12 @@ func RenderIndexPage(b *Builder) error {
 			TitleHTML    template.HTML
 			SubtitleText string
 		}
-		Featured    []campaignItem
-		NonFeatured []campaignItem
+		Featured   []campaignItem
+		TotalCount int
 	}{
-		Site:        b.config.Site,
-		Featured:    featured,
-		NonFeatured: nonFeatured,
+		Site:       b.config.Site,
+		Featured:   featured,
+		TotalCount: len(all),
 	}
 	data.Hero.TitleHTML = heroTitleHTML
 	data.Hero.SubtitleText = b.config.Site.IndexSubtitle

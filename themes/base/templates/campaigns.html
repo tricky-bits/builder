@@ -1,0 +1,62 @@
+{{define "title"}}All campaigns — {{.Site.DocumentTitle}}{{end}}
+
+{{define "content"}}
+<div class="tb-container">
+    <section class="tb-block tb-block--campaigns-head">
+        <h1 class="tb-section-title">All campaigns</h1>
+    </section>
+
+    {{if .Tags}}
+    <section class="tb-block tb-block--tag-filter">
+        <div class="tb-chips" id="tb-tag-filter">
+            {{range .Tags}}<button type="button" class="tb-chip tb-chip--filter" data-tb-tag="{{.}}">{{.}}</button>{{end}}
+        </div>
+        <button type="button" class="tb-btn tb-btn-secondary" id="tb-tag-clear" style="display:none; margin-top: 12px;">Clear filters</button>
+    </section>
+    {{end}}
+
+    <section class="tb-block tb-block--available" id="tb-available">
+        <p class="tb-label" style="margin-bottom: 8px;">// <span class="tb-section-num">01</span></p>
+        <h2 class="tb-section-title">Available</h2>
+        <div class="columns is-multiline" id="tb-available-grid">
+            {{range .Campaigns}}
+            <div class="column is-4">
+                <a class="tb-card tb-card--available"
+                    href="{{urlJoin $.Site.BasePath "campaigns" .Slug}}"
+                    data-tb-campaign-id="{{.Slug}}"
+                    data-tb-tags="{{.Tags | json}}">
+                    <div class="tb-card-body">
+                        <p class="tb-card-title">{{.Title}}</p>
+                        <div class="tb-chips">
+                            {{if .Category}}<span class="tb-chip tb-chip--dim">{{.Category}}</span>{{end}}
+                            {{if gt .ETAMinutes 0}}<span class="tb-chip tb-chip--dim">~{{.ETAMinutes}}m</span>{{end}}
+                            <span class="tb-chip tb-chip--dim">{{.StageCount}} stages</span>
+                            {{if gt .Difficulty 0}}<span class="tb-chip tb-chip--dim">Difficulty: {{.Difficulty}}/5</span>{{end}}
+                        </div>
+                        {{if .Abstract}}<div class="tb-card-abstract tb-clamp-2">{{.Abstract}}</div>{{end}}
+                    </div>
+                </a>
+            </div>
+            {{end}}
+        </div>
+    </section>
+
+    <section class="tb-block tb-block--completed" id="tb-completed" style="display:none;">
+        <p class="tb-label" style="margin-bottom: 8px;">// <span class="tb-section-num">02</span></p>
+        <h2 class="tb-section-title">Completed</h2>
+        <div class="tb-list" id="tb-completed-list"></div>
+    </section>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+TBProgress.initCampaigns({
+    campaigns: [
+        {{range $i, $c := .Campaigns}}{{if $i}},{{end}}{ id: {{$c.Slug | json}}, order: {{$c.StageOrderedSlugs | json}}, tags: {{$c.Tags | json}} }{{end}}
+    ]
+});
+</script>
+{{end}}
+
+{{template "base.html" .}}
