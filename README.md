@@ -20,7 +20,7 @@ go build -o builder .
 Then build the bundled example site (run from the repo root):
 
 ```sh
-./builder build -c example/tbb.toml
+./builder build -c example/config.toml
 ```
 
 This reads content from `example/`, resolves themes from `themes/`, and writes
@@ -30,15 +30,49 @@ the generated site to `example/public/`. Serve it with any static file server:
 cd example/public && python3 -m http.server
 ```
 
-`build` flags:
+Or skip the manual rebuild loop entirely with `serve` (see below), which
+builds, serves, and rebuilds on every change automatically:
 
-| Flag           | Default     | Description          |
-|----------------|-------------|----------------------|
-| `-c, --config` | `tbb.toml`  | Path to config file  |
+```sh
+./builder serve -c example/config.toml
+```
+
+`builder` with no subcommand behaves like `build`.
+
+`--config`/`-c` is a persistent flag, shared by `build` and `serve`:
+
+| Flag           | Default       | Description          |
+|----------------|---------------|-----------------------|
+| `-c, --config` | `config.toml` | Path to config file  |
+
+### `serve`
+
+Builds once, then serves the site locally while watching for changes:
+
+```sh
+./builder serve -c example/config.toml
+```
+
+- Every change to the input dir (campaigns, pages, inputs/assets), the active
+  theme's directory, or the config file itself triggers a rebuild.
+- Each rebuild renders into a fresh scratch directory (never the configured
+  `output_dir`) and atomically swaps it in once it succeeds, so in-flight
+  requests never see a half-written site.
+- Connected browser tabs auto-reload after each successful rebuild via an
+  injected livereload script (websocket-based, like Hugo's dev server). A
+  rebuild that fails logs the error and keeps serving the last good build
+  instead of crashing.
+
+`serve` flags (in addition to `-c, --config`):
+
+| Flag       | Default     | Description                    |
+|------------|-------------|--------------------------------|
+| `--bind`   | `127.0.0.1` | Address to bind the dev server |
+| `--port`   | `1313`      | Port to serve on               |
 
 ## Configuration
 
-### Site config (`tbb.toml`)
+### Site config (`config.toml`)
 
 TOML, with two sections: `[build]` (pipeline settings, never exposed to
 templates) and `[site]` (global settings exposed to templates).
