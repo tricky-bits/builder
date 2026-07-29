@@ -1,0 +1,50 @@
+site_name: Tricky Bits Builder
+site_description: Static site generator for tricky-bits puzzle sites
+site_url: https://docs.trickybits.dev/
+repo_url: https://github.com/tricky-bits/builder
+repo_name: tricky-bits/builder
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - content.code.copy
+    - content.action.edit
+    - navigation.footer
+    - navigation.top
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quick-start.md
+  - Campaigns: campaigns.md
+  - Stages: stages.md
+  - Pages: pages.md
+  - Themes: themes.md
+  - Obfuscation: obfuscation.md
+  - Configuration: configuration.md
+  - CLI Reference: cli-reference.md
