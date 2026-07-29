@@ -1,0 +1,30 @@
+/* Dark-only palette derived from themes/base/static/style.css */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0e1010;
+  --md-primary-fg-color--light: #141818;
+  --md-primary-fg-color--dark: #0a0d0d;
+  --md-primary-bg-color: #e4ede4;
+  --md-primary-bg-color--light: #7a9a7a;
+
+  --md-accent-fg-color: #b6f0a1;
+  --md-accent-fg-color--transparent: #b6f0a11a;
+  --md-accent-bg-color: #0e1010;
+
+  --md-default-bg-color: #0e1010;
+  --md-default-fg-color: #e4ede4;
+  --md-default-fg-color--light: #7a9a7a;
+  --md-default-fg-color--lighter: #4a6a4a;
+
+  --md-typeset-color: #e4ede4;
+  --md-typeset-a-color: #6ebd5d;
+
+  --md-code-bg-color: #141818;
+  --md-code-fg-color: #e4ede4;
+
+  --md-footer-bg-color: #0a0d0d;
+  --md-footer-fg-color: #e4ede4;
+}
+
+.md-typeset p {
+  text-align: justify;
+}
