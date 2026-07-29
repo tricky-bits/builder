@@ -15,7 +15,7 @@ chosen to exercise a different part of the system.
 ## What this example demonstrates
 
 - **Pages** rendered to the site root (`about.html`, `guide.html`, `terms.html`).
-- **Navigation** — pages wired into the navbar and footer from `tbb.toml`.
+- **Navigation** — pages wired into the navbar and footer from `config.toml`.
 - **Featured vs. ordinary campaigns** — featured ones appear in the home-page strip.
 - **Rich markdown** — headings, lists, tables, task lists, blockquotes, code
   blocks, links, images, and emphasis.

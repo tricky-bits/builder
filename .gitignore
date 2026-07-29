@@ -1,0 +1,5 @@
+# Built example site output (regenerate with: go run . build -c example/config.toml)
+example/public/
+
+# Compiled binaries
+/builder
