@@ -23,14 +23,14 @@ func ListFiles(path, ext string) ([]string, error) {
 	}
 
 	var out []string
-	if err := filepath.Walk(path, func(p string, fi os.FileInfo, walkErr error) error {
+	if err := filepath.WalkDir(path, func(p string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if fi == nil || fi.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
-		if filepath.Ext(fi.Name()) != ext {
+		if filepath.Ext(d.Name()) != ext {
 			return nil
 		}
 		out = append(out, p)

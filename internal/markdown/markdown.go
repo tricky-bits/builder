@@ -26,15 +26,7 @@ var md = goldmark.New(
 // Parse opens a file, parses it using goldmark.Convert, and retrieves
 // frontmatter using the goldmark-frontmatter package into fm.
 func Parse(filename string, writer io.Writer, fm any) error {
-	// Open the file
-	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Read file content
-	content, err := io.ReadAll(file)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
